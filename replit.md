@@ -8,7 +8,7 @@ A comprehensive web-based platform for driving schools that digitizes the comple
 - Frontend: React with TypeScript, Vite, TailwindCSS, shadcn/ui components
 - Backend: Express.js with TypeScript
 - Database: PostgreSQL via Neon with Drizzle ORM
-- Authentication: Replit Auth (OpenID Connect) with Passport.js
+- Authentication: Dual authentication (Replit Auth SSO + Email/Password with passport-local)
 - Payments: Stripe integration
 - State Management: TanStack Query (React Query)
 
@@ -56,10 +56,15 @@ Preferred communication style: Simple, everyday language.
 - Separation of concerns: routes, storage layer, authentication
 
 **Authentication & Authorization:**
-- Replit Auth integration using OpenID Connect (Passport.js Strategy)
+- Dual authentication system supports two methods:
+  1. **Replit Auth (SSO)**: OpenID Connect via Passport.js Strategy with automatic token refresh
+  2. **Email/Password (Local)**: passport-local strategy with bcrypt password hashing
+- Session detection: Local auth users lack `access_token` field in session
+- Logout endpoint: Detects auth method and uses appropriate logout flow (local redirect vs OIDC end-session)
 - Session management with PostgreSQL store (`connect-pg-simple`)
 - Role-based access control middleware (`requireRole`)
 - Session cookie with 1-week TTL, HTTP-only, secure flags
+- Indexed email lookups via `getUserByEmail` for performance
 
 **Data Access Layer:**
 - Storage interface pattern (`IStorage`) in `server/storage.ts`
@@ -81,7 +86,7 @@ Preferred communication style: Simple, everyday language.
 ### Database Schema
 
 **Core Entities:**
-- `users` - Authentication and profile data with role enum (student/instructor/admin)
+- `users` - Authentication and profile data with role enum (student/instructor/admin), password field (nullable, only for local auth)
 - `courses` - Course definitions with pricing, duration, requirements
 - `topics` - Course content structure (theory/practice)
 - `questions` - Question bank for assessments (single/multiple choice)
