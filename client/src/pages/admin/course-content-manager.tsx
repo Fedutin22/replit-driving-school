@@ -168,6 +168,28 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
     },
   });
 
+  // Auto-select first topic for Posts when dialog opens
+  useEffect(() => {
+    if (open && topics && topics.length > 0 && !selectedTopic) {
+      setSelectedTopic(topics[0]);
+    }
+  }, [open, topics]);
+
+  // Auto-select first topic for Assessments when dialog opens
+  useEffect(() => {
+    if (open && topics && topics.length > 0 && !selectedTopicForAssessments) {
+      setSelectedTopicForAssessments(topics[0]);
+    }
+  }, [open, topics]);
+
+  // Reset selections when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setSelectedTopic(null);
+      setSelectedTopicForAssessments(null);
+    }
+  }, [open]);
+
   // Current assessment mode for effect dependencies
   const currentMode = assessmentForm.watch("mode");
   
