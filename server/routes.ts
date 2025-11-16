@@ -849,6 +849,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/admin/topics/:id/reorder', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { direction } = req.body;
+      
+      if (!direction || !['up', 'down'].includes(direction)) {
+        return res.status(400).json({ message: "Invalid direction. Must be 'up' or 'down'" });
+      }
+
+      await storage.reorderTopic(id, direction);
+      res.json({ message: "Topic reordered successfully" });
+    } catch (error) {
+      console.error("Error reordering topic:", error);
+      res.status(500).json({ message: "Failed to reorder topic" });
+    }
+  });
+
   app.get('/api/posts', isAuthenticated, async (req: any, res) => {
     try {
       const { topicId } = req.query;
@@ -895,6 +912,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting post:", error);
       res.status(500).json({ message: "Failed to delete post" });
+    }
+  });
+
+  app.post('/api/admin/posts/:id/reorder', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { direction } = req.body;
+      
+      if (!direction || !['up', 'down'].includes(direction)) {
+        return res.status(400).json({ message: "Invalid direction. Must be 'up' or 'down'" });
+      }
+
+      await storage.reorderPost(id, direction);
+      res.json({ message: "Post reordered successfully" });
+    } catch (error) {
+      console.error("Error reordering post:", error);
+      res.status(500).json({ message: "Failed to reorder post" });
     }
   });
 

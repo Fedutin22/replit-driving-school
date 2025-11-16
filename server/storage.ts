@@ -63,12 +63,14 @@ export interface IStorage {
   createTopic(topic: InsertTopic): Promise<Topic>;
   updateTopic(id: string, data: Partial<Topic>): Promise<Topic>;
   deleteTopic(id: string): Promise<void>;
+  reorderTopic(id: string, direction: 'up' | 'down'): Promise<void>;
   
   // Post operations
   getPostsByTopic(topicId: string): Promise<Post[]>;
   createPost(post: InsertPost): Promise<Post>;
   updatePost(id: string, data: Partial<Post>): Promise<Post>;
   deletePost(id: string): Promise<void>;
+  reorderPost(id: string, direction: 'up' | 'down'): Promise<void>;
   
   // Question operations
   getQuestions(): Promise<Question[]>;
@@ -217,6 +219,30 @@ export class DatabaseStorage implements IStorage {
     await db.delete(topics).where(eq(topics.id, id));
   }
 
+  async reorderTopic(id: string, direction: 'up' | 'down'): Promise<void> {
+    const topic = await db.select().from(topics).where(eq(topics.id, id)).limit(1);
+    if (!topic[0]) throw new Error("Topic not found");
+
+    const currentIndex = topic[0].orderIndex;
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+    // Find the topic at the target position
+    const targetTopic = await db
+      .select()
+      .from(topics)
+      .where(and(
+        eq(topics.courseId, topic[0].courseId),
+        eq(topics.orderIndex, newIndex)
+      ))
+      .limit(1);
+
+    if (targetTopic[0]) {
+      // Swap order indices
+      await db.update(topics).set({ orderIndex: newIndex }).where(eq(topics.id, id));
+      await db.update(topics).set({ orderIndex: currentIndex }).where(eq(topics.id, targetTopic[0].id));
+    }
+  }
+
   // Post operations
   async getPostsByTopic(topicId: string): Promise<Post[]> {
     return await db
@@ -242,6 +268,30 @@ export class DatabaseStorage implements IStorage {
 
   async deletePost(id: string): Promise<void> {
     await db.delete(posts).where(eq(posts.id, id));
+  }
+
+  async reorderPost(id: string, direction: 'up' | 'down'): Promise<void> {
+    const post = await db.select().from(posts).where(eq(posts.id, id)).limit(1);
+    if (!post[0]) throw new Error("Post not found");
+
+    const currentIndex = post[0].orderIndex;
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+    // Find the post at the target position
+    const targetPost = await db
+      .select()
+      .from(posts)
+      .where(and(
+        eq(posts.topicId, post[0].topicId),
+        eq(posts.orderIndex, newIndex)
+      ))
+      .limit(1);
+
+    if (targetPost[0]) {
+      // Swap order indices
+      await db.update(posts).set({ orderIndex: newIndex }).where(eq(posts.id, id));
+      await db.update(posts).set({ orderIndex: currentIndex }).where(eq(posts.id, targetPost[0].id));
+    }
   }
 
   // Question operations
