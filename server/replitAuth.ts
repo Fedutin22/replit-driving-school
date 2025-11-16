@@ -1,5 +1,7 @@
 import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
+import { Strategy as LocalStrategy } from "passport-local";
+import bcrypt from "bcrypt";
 
 import passport from "passport";
 import session from "express-session";
@@ -101,6 +103,30 @@ export async function setupAuth(app: Express) {
     }
   };
 
+  // Setup passport-local strategy for email/password auth
+  passport.use(new LocalStrategy(
+    { usernameField: 'email' },
+    async (email, password, done) => {
+      try {
+        const users = await storage.getAllUsers();
+        const user = users.find(u => u.email === email);
+        
+        if (!user || !user.password) {
+          return done(null, false, { message: 'Invalid email or password' });
+        }
+        
+        const isValidPassword = await bcrypt.compare(password, user.password);
+        if (!isValidPassword) {
+          return done(null, false, { message: 'Invalid email or password' });
+        }
+        
+        return done(null, { claims: { sub: user.id, email: user.email } });
+      } catch (error) {
+        return done(error);
+      }
+    }
+  ));
+
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
@@ -135,10 +161,16 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
+  // Local auth users don't have expires_at, so just check if authenticated
+  if (!user.expires_at) {
+    return next();
+  }
+
+  // For Replit Auth users, check token expiration and refresh if needed
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
     return next();

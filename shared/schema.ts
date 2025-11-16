@@ -33,10 +33,11 @@ export const testModeEnum = pgEnum("test_mode", ["random", "manual"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "failed"]);
 export const attendanceStatusEnum = pgEnum("attendance_status", ["present", "absent"]);
 
-// Users table (required for Replit Auth, extended with role)
+// Users table (supports both Replit Auth and local email/password auth)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
+  password: varchar("password"),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),

@@ -7,6 +7,8 @@ import { z } from "zod";
 import { insertCourseSchema, insertTopicSchema, insertQuestionSchema, insertTestTemplateSchema, insertScheduleSchema } from "@shared/schema";
 import express from "express";
 import PDFDocument from "pdfkit";
+import bcrypt from "bcrypt";
+import passport from "passport";
 
 // CSV helper to escape fields
 function csvEscape(value: string | number | boolean | null | undefined): string {
@@ -29,6 +31,60 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Registration endpoint for email/password auth
+  app.post('/api/register', async (req, res) => {
+    try {
+      const { email, password, firstName, lastName, role } = req.body;
+      
+      // Validate input
+      if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      
+      // Check if user already exists
+      const users = await storage.getAllUsers();
+      if (users.find(u => u.email === email)) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Create user
+      const user = await storage.upsertUser({
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        role: role || 'student', // Default to student role
+      });
+      
+      res.json({ message: "Registration successful", userId: user.id });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  // Login endpoint for email/password auth
+  app.post('/api/local-login', (req, res, next) => {
+    passport.authenticate('local', (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Login error" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Session error" });
+        }
+        res.json({ message: "Login successful" });
+      });
+    })(req, res, next);
+  });
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
