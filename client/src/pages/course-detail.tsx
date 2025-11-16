@@ -5,15 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, FileText, GraduationCap, ArrowLeft } from "lucide-react";
-import type { Course, Topic, Post, TestTemplate } from "@shared/schema";
+import type { Course, Topic, Post, TestTemplate, TopicAssessment } from "@shared/schema";
 
-interface TopicWithPosts extends Topic {
+interface TopicWithContent extends Topic {
   posts: Post[];
+  assessments: TopicAssessment[];
 }
 
 interface CourseWithContent {
   course: Course;
-  topics: TopicWithPosts[];
+  topics: TopicWithContent[];
   tests: TestTemplate[];
 }
 
@@ -112,33 +113,93 @@ export default function CourseDetail() {
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
-                      {topic.posts.length === 0 ? (
-                        <p className="text-muted-foreground text-sm py-4 px-4">
-                          No content available for this topic yet
-                        </p>
-                      ) : (
-                        <div className="space-y-4 py-4">
-                          {topic.posts.map((post, postIndex) => (
-                            <Card key={post.id} data-testid={`card-post-${post.id}`}>
-                              <CardHeader>
-                                <div className="flex items-center gap-2">
-                                  <FileText className="h-4 w-4 text-muted-foreground" />
-                                  <CardTitle className="text-base" data-testid={`text-post-title-${post.id}`}>
-                                    {postIndex + 1}. {post.title}
-                                  </CardTitle>
+                      <div className="space-y-4 py-4">
+                        {topic.posts.length === 0 && topic.assessments.length === 0 ? (
+                          <p className="text-muted-foreground text-sm py-4 px-4">
+                            No content available for this topic yet
+                          </p>
+                        ) : (
+                          <>
+                            {topic.posts.length > 0 && (
+                              <div className="space-y-4">
+                                {topic.posts.map((post, postIndex) => (
+                                  <Card key={post.id} data-testid={`card-post-${post.id}`}>
+                                    <CardHeader>
+                                      <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-muted-foreground" />
+                                        <CardTitle className="text-base" data-testid={`text-post-title-${post.id}`}>
+                                          {postIndex + 1}. {post.title}
+                                        </CardTitle>
+                                      </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                      <div
+                                        className="prose prose-sm dark:prose-invert max-w-none"
+                                        dangerouslySetInnerHTML={{ __html: post.content }}
+                                        data-testid={`text-post-content-${post.id}`}
+                                      />
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            )}
+                            
+                            {topic.assessments.length > 0 && (
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-2 px-4">
+                                  <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                                  <h4 className="text-sm font-semibold">Topic Assessments</h4>
                                 </div>
-                              </CardHeader>
-                              <CardContent>
-                                <div
-                                  className="prose prose-sm dark:prose-invert max-w-none"
-                                  dangerouslySetInnerHTML={{ __html: post.content }}
-                                  data-testid={`text-post-content-${post.id}`}
-                                />
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
+                                {topic.assessments.map((assessment) => (
+                                  <Card key={assessment.id} data-testid={`card-assessment-${assessment.id}`}>
+                                    <CardHeader>
+                                      <div className="flex items-center gap-2 justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <CardTitle className="text-base" data-testid={`text-assessment-name-${assessment.id}`}>
+                                            {assessment.name}
+                                          </CardTitle>
+                                          {assessment.isRequired && (
+                                            <Badge variant="default" data-testid={`badge-required-${assessment.id}`}>
+                                              Required
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {assessment.description && (
+                                        <CardDescription data-testid={`text-assessment-description-${assessment.id}`}>
+                                          {assessment.description}
+                                        </CardDescription>
+                                      )}
+                                    </CardHeader>
+                                    <CardContent className="flex items-center justify-between gap-4">
+                                      <div className="space-y-2 text-sm">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-muted-foreground">Passing Score:</span>
+                                          <Badge variant="secondary" data-testid={`badge-passing-percentage-${assessment.id}`}>
+                                            {assessment.passingPercentage}%
+                                          </Badge>
+                                        </div>
+                                        {assessment.mode === 'random' && assessment.questionCount && (
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-muted-foreground">Questions:</span>
+                                            <span data-testid={`text-question-count-${assessment.id}`}>{assessment.questionCount}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <Button
+                                        onClick={() => setLocation(`/assessments/${assessment.id}/take`)}
+                                        data-testid={`button-start-assessment-${assessment.id}`}
+                                      >
+                                        Start Assessment
+                                      </Button>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </AccordionContent>
                   </AccordionItem>
                 ))}

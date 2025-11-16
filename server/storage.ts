@@ -695,6 +695,81 @@ export class DatabaseStorage implements IStorage {
     return instance;
   }
 
+  async checkAndUpdateCourseCompletion(studentId: string, courseId: string): Promise<void> {
+    // Get enrollment
+    const enrollments = await db
+      .select()
+      .from(courseEnrollments)
+      .where(
+        and(
+          eq(courseEnrollments.studentId, studentId),
+          eq(courseEnrollments.courseId, courseId)
+        )
+      );
+
+    if (enrollments.length === 0) {
+      return; // No enrollment found
+    }
+
+    const enrollment = enrollments[0];
+
+    // If already completed, no need to check
+    if (enrollment.completedAt) {
+      return;
+    }
+
+    // Get all topics for this course
+    const topicsData = await db
+      .select()
+      .from(topics)
+      .where(eq(topics.courseId, courseId));
+
+    // Get all required assessments for this course
+    const requiredAssessments = await db
+      .select()
+      .from(topicAssessments)
+      .where(
+        and(
+          inArray(topicAssessments.topicId, topicsData.map(t => t.id)),
+          eq(topicAssessments.isRequired, true)
+        )
+      );
+
+    if (requiredAssessments.length === 0) {
+      // No required assessments, mark as complete
+      await db
+        .update(courseEnrollments)
+        .set({ completedAt: new Date() })
+        .where(eq(courseEnrollments.id, enrollment.id));
+      return;
+    }
+
+    // Check if all required assessments have a passing test instance
+    for (const assessment of requiredAssessments) {
+      const passingInstances = await db
+        .select()
+        .from(testInstances)
+        .where(
+          and(
+            eq(testInstances.studentId, studentId),
+            eq(testInstances.topicAssessmentId, assessment.id),
+            eq(testInstances.passed, true)
+          )
+        );
+
+      if (passingInstances.length === 0) {
+        // At least one required assessment not passed
+        return;
+      }
+    }
+
+    // All required assessments passed, mark course as complete
+    await db
+      .update(courseEnrollments)
+      .set({ completedAt: new Date() })
+      .where(eq(courseEnrollments.id, enrollment.id));
+  }
+
   async getTestInstancesByStudent(studentId: string): Promise<TestInstance[]> {
     return await db
       .select()
@@ -887,13 +962,27 @@ export class DatabaseStorage implements IStorage {
     const passed = percentage >= passingPercentage;
 
     // Update test instance
-    return await this.updateTestInstance(testInstanceId, {
+    const updatedInstance = await this.updateTestInstance(testInstanceId, {
       answersData: answers,
       score: correctCount,
       percentage,
       passed,
       submittedAt: new Date(),
     });
+
+    // Check if course should be marked as complete
+    if (passed && updatedInstance.topicAssessmentId) {
+      // Get the topic and course for this assessment
+      const assessment = await this.getTopicAssessment(updatedInstance.topicAssessmentId);
+      if (assessment) {
+        const topic = await this.getTopic(assessment.topicId);
+        if (topic) {
+          await this.checkAndUpdateCourseCompletion(instance.studentId, topic.courseId);
+        }
+      }
+    }
+
+    return updatedInstance;
   }
 
   // Enrollment operations

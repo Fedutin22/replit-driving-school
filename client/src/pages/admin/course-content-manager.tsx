@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Edit, Trash, FileText, List, ArrowUp, ArrowDown } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { Course, Topic, Post, TopicAssessment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -31,8 +32,20 @@ const postSchema = z.object({
   orderIndex: z.coerce.number().default(0),
 });
 
+const assessmentSchema = z.object({
+  name: z.string().min(1, "Assessment name is required"),
+  description: z.string().optional(),
+  isRequired: z.boolean().default(false),
+  passingPercentage: z.coerce.number().min(0).max(100).default(70),
+  mode: z.enum(["random", "manual"]).default("random"),
+  questionCount: z.coerce.number().min(1).default(10),
+  randomizeQuestions: z.boolean().default(false),
+  orderIndex: z.coerce.number().default(0),
+});
+
 type TopicForm = z.infer<typeof topicSchema>;
 type PostForm = z.infer<typeof postSchema>;
+type AssessmentForm = z.infer<typeof assessmentSchema>;
 
 interface CourseContentManagerProps {
   course: Course;
@@ -43,10 +56,13 @@ interface CourseContentManagerProps {
 export function CourseContentManager({ course, open, onClose }: CourseContentManagerProps) {
   const { toast } = useToast();
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
+  const [selectedTopicForAssessments, setSelectedTopicForAssessments] = useState<Topic | null>(null);
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
+  const [editingAssessment, setEditingAssessment] = useState<TopicAssessment | null>(null);
   const [isTopicDialogOpen, setIsTopicDialogOpen] = useState(false);
   const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
+  const [isAssessmentDialogOpen, setIsAssessmentDialogOpen] = useState(false);
 
   const { data: topics, isLoading: topicsLoading } = useQuery<Topic[]>({
     queryKey: ["/api/topics", course.id],
@@ -69,6 +85,17 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
     enabled: !!selectedTopic,
   });
 
+  const { data: assessments, isLoading: assessmentsLoading } = useQuery<TopicAssessment[]>({
+    queryKey: ["/api/admin/topics", selectedTopicForAssessments?.id, "assessments"],
+    queryFn: async () => {
+      if (!selectedTopicForAssessments) return [];
+      const response = await fetch(`/api/admin/topics/${selectedTopicForAssessments.id}/assessments`);
+      if (!response.ok) throw new Error("Failed to fetch assessments");
+      return response.json();
+    },
+    enabled: !!selectedTopicForAssessments,
+  });
+
   const topicForm = useForm<TopicForm>({
     resolver: zodResolver(topicSchema),
     defaultValues: {
@@ -84,6 +111,20 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
     defaultValues: {
       title: "",
       content: "",
+      orderIndex: 0,
+    },
+  });
+
+  const assessmentForm = useForm<AssessmentForm>({
+    resolver: zodResolver(assessmentSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      isRequired: false,
+      passingPercentage: 70,
+      mode: "random",
+      questionCount: 10,
+      randomizeQuestions: false,
       orderIndex: 0,
     },
   });
@@ -262,6 +303,86 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
       });
     }
     setIsPostDialogOpen(true);
+  };
+
+  const createOrUpdateAssessmentMutation = useMutation({
+    mutationFn: async (data: AssessmentForm) => {
+      if (!selectedTopicForAssessments) throw new Error("No topic selected");
+      if (editingAssessment) {
+        await apiRequest("PATCH", `/api/admin/assessments/${editingAssessment.id}`, data);
+      } else {
+        await apiRequest("POST", `/api/admin/topics/${selectedTopicForAssessments.id}/assessments`, data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/topics", selectedTopicForAssessments?.id, "assessments"] });
+      setIsAssessmentDialogOpen(false);
+      setEditingAssessment(null);
+      assessmentForm.reset();
+      toast({
+        title: editingAssessment ? "Assessment Updated" : "Assessment Created",
+        description: `Assessment has been ${editingAssessment ? "updated" : "created"} successfully`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteAssessmentMutation = useMutation({
+    mutationFn: async (assessmentId: string) => {
+      await apiRequest("DELETE", `/api/admin/assessments/${assessmentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/topics", selectedTopicForAssessments?.id, "assessments"] });
+      toast({
+        title: "Assessment Deleted",
+        description: "Assessment has been deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOpenAssessmentDialog = (assessment?: TopicAssessment) => {
+    if (assessment) {
+      setEditingAssessment(assessment);
+      assessmentForm.reset({
+        name: assessment.name,
+        description: assessment.description || "",
+        isRequired: assessment.isRequired,
+        passingPercentage: assessment.passingPercentage,
+        mode: assessment.mode,
+        questionCount: assessment.questionCount || 10,
+        randomizeQuestions: assessment.randomizeQuestions,
+        orderIndex: assessment.orderIndex,
+      });
+    } else {
+      setEditingAssessment(null);
+      const maxOrderIndex = assessments && assessments.length > 0
+        ? Math.max(...assessments.map(a => a.orderIndex))
+        : -1;
+      assessmentForm.reset({
+        name: "",
+        description: "",
+        isRequired: false,
+        passingPercentage: 70,
+        mode: "random",
+        questionCount: 10,
+        randomizeQuestions: false,
+        orderIndex: maxOrderIndex + 1,
+      });
+    }
+    setIsAssessmentDialogOpen(true);
   };
 
   return (
@@ -479,6 +600,106 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                 </>
               )}
             </TabsContent>
+
+            <TabsContent value="assessments" className="space-y-4">
+              <div className="flex justify-between items-center gap-4">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium mb-2 block">Select Topic</Label>
+                  <Select
+                    value={selectedTopicForAssessments?.id || ""}
+                    onValueChange={(value) => {
+                      const topic = topics?.find(t => t.id === value);
+                      setSelectedTopicForAssessments(topic || null);
+                    }}
+                    data-testid="select-assessment-topic"
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a topic to manage assessments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {topics?.map((topic) => (
+                        <SelectItem key={topic.id} value={topic.id}>
+                          {topic.name} ({topic.type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedTopicForAssessments && (
+                  <Button size="sm" onClick={() => handleOpenAssessmentDialog()} data-testid="button-add-assessment" className="mt-6">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Assessment
+                  </Button>
+                )}
+              </div>
+
+              {!selectedTopicForAssessments ? (
+                <p className="text-sm text-muted-foreground text-center py-12">
+                  Select a topic above to view and manage its assessments
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center">
+                    <p className="text-sm text-muted-foreground">
+                      {assessments?.length || 0} assessments in {selectedTopicForAssessments.name}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {assessmentsLoading ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">Loading assessments...</p>
+                    ) : !assessments || assessments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        No assessments yet. Create your first assessment to test student knowledge.
+                      </p>
+                    ) : (
+                      assessments.map((assessment) => (
+                        <Card key={assessment.id}>
+                          <CardHeader className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <CardTitle className="text-base" data-testid={`text-assessment-name-${assessment.id}`}>
+                                    {assessment.name}
+                                  </CardTitle>
+                                  {assessment.isRequired && (
+                                    <Badge variant="default" data-testid={`badge-required-${assessment.id}`}>Required</Badge>
+                                  )}
+                                </div>
+                                {assessment.description && (
+                                  <p className="text-sm text-muted-foreground mt-1">{assessment.description}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Mode: {assessment.mode} | Passing: {assessment.passingPercentage}% | Questions: {assessment.questionCount || 10}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenAssessmentDialog(assessment)}
+                                  data-testid={`button-edit-assessment-${assessment.id}`}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteAssessmentMutation.mutate(assessment.id)}
+                                  data-testid={`button-delete-assessment-${assessment.id}`}
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardHeader>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </TabsContent>
           </Tabs>
         </DialogContent>
       </Dialog>
@@ -621,6 +842,155 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                   data-testid="button-save-post"
                 >
                   {createOrUpdatePostMutation.isPending ? "Saving..." : editingPost ? "Update Post" : "Create Post"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAssessmentDialogOpen} onOpenChange={setIsAssessmentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingAssessment ? "Edit Assessment" : "Create New Assessment"}</DialogTitle>
+            <DialogDescription>
+              {editingAssessment ? "Update assessment details" : "Add a new assessment to this topic"}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...assessmentForm}>
+            <form onSubmit={assessmentForm.handleSubmit((data) => createOrUpdateAssessmentMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={assessmentForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assessment Name</FormLabel>
+                    <FormControl>
+                      <Input data-testid="input-assessment-name" placeholder="e.g., Road Signs Quiz" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={assessmentForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        data-testid="input-assessment-description"
+                        placeholder="Describe this assessment..."
+                        rows={2}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={assessmentForm.control}
+                  name="isRequired"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={field.onChange}
+                          data-testid="checkbox-assessment-required"
+                          className="h-4 w-4"
+                        />
+                      </FormControl>
+                      <FormLabel className="!mt-0">Required for completion</FormLabel>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={assessmentForm.control}
+                  name="randomizeQuestions"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          checked={field.value}
+                          onChange={field.onChange}
+                          data-testid="checkbox-randomize-questions"
+                          className="h-4 w-4"
+                        />
+                      </FormControl>
+                      <FormLabel className="!mt-0">Randomize questions</FormLabel>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={assessmentForm.control}
+                  name="passingPercentage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Passing Percentage</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" max="100" data-testid="input-passing-percentage" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={assessmentForm.control}
+                  name="questionCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Number of Questions</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" data-testid="input-question-count" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={assessmentForm.control}
+                name="mode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mode</FormLabel>
+                    <FormControl>
+                      <select
+                        className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                        data-testid="select-assessment-mode"
+                        {...field}
+                      >
+                        <option value="random">Random (from question bank)</option>
+                        <option value="manual">Manual (select specific questions)</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAssessmentDialogOpen(false)}
+                  data-testid="button-cancel-assessment"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createOrUpdateAssessmentMutation.isPending}
+                  data-testid="button-save-assessment"
+                >
+                  {createOrUpdateAssessmentMutation.isPending ? "Saving..." : editingAssessment ? "Update Assessment" : "Create Assessment"}
                 </Button>
               </DialogFooter>
             </form>
