@@ -104,8 +104,11 @@ export interface IStorage {
   
   // Schedule operations
   getSchedules(): Promise<Schedule[]>;
+  getSchedulesByCourse(courseId: string): Promise<Schedule[]>;
+  getSchedule(id: string): Promise<Schedule | undefined>;
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
   updateSchedule(id: string, data: Partial<Schedule>): Promise<Schedule>;
+  deleteSchedule(id: string): Promise<void>;
   registerForSession(scheduleId: string, studentId: string): Promise<void>;
   unregisterFromSession(scheduleId: string, studentId: string): Promise<void>;
   getSessionRegistrationCount(scheduleId: string): Promise<number>;
@@ -572,6 +575,19 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(schedules).orderBy(schedules.startTime);
   }
 
+  async getSchedulesByCourse(courseId: string): Promise<Schedule[]> {
+    return await db
+      .select()
+      .from(schedules)
+      .where(eq(schedules.courseId, courseId))
+      .orderBy(schedules.startTime);
+  }
+
+  async getSchedule(id: string): Promise<Schedule | undefined> {
+    const [schedule] = await db.select().from(schedules).where(eq(schedules.id, id));
+    return schedule || undefined;
+  }
+
   async createSchedule(scheduleData: InsertSchedule): Promise<Schedule> {
     const [schedule] = await db.insert(schedules).values(scheduleData).returning();
     return schedule;
@@ -584,6 +600,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schedules.id, id))
       .returning();
     return schedule;
+  }
+
+  async deleteSchedule(id: string): Promise<void> {
+    await db.delete(schedules).where(eq(schedules.id, id));
   }
 
   async registerForSession(scheduleId: string, studentId: string): Promise<void> {
