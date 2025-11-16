@@ -12,7 +12,10 @@ import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import Home from "@/pages/home";
 import Courses from "@/pages/courses";
+import CourseDetail from "@/pages/course-detail";
 import Tests from "@/pages/tests";
+import TakeTest from "@/pages/take-test";
+import TestResults from "@/pages/test-results";
 import SchedulePage from "@/pages/schedule";
 import Payments from "@/pages/payments";
 import Certificates from "@/pages/certificates";
@@ -52,7 +55,10 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/courses" component={Courses} />
+          <Route path="/courses/:courseId" component={CourseDetail} />
           <Route path="/tests" component={Tests} />
+          <Route path="/tests/:testId/take" component={TakeTest} />
+          <Route path="/test-results/:instanceId" component={TestResults} />
           <Route path="/schedule" component={SchedulePage} />
           <Route path="/payments" component={Payments} />
           <Route path="/certificates" component={Certificates} />

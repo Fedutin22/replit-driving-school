@@ -4,7 +4,9 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
 import Stripe from "stripe";
 import { z } from "zod";
-import { insertCourseSchema, insertTopicSchema, insertPostSchema, insertQuestionSchema, insertTestTemplateSchema, insertScheduleSchema } from "@shared/schema";
+import { insertCourseSchema, insertTopicSchema, insertPostSchema, insertQuestionSchema, insertTestTemplateSchema, insertScheduleSchema, courseCompletionTests } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import express from "express";
 import PDFDocument from "pdfkit";
 import bcrypt from "bcrypt";
@@ -168,6 +170,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error enrolling in course:", error);
       res.status(500).json({ message: "Failed to enroll in course" });
+    }
+  });
+
+  // Get course with content (topics, posts, tests)
+  app.get('/api/courses/:courseId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { courseId } = req.params;
+
+      // Check if student is enrolled
+      const enrollment = await storage.getEnrollment(courseId, userId);
+      if (!enrollment) {
+        return res.status(403).json({ message: "You must be enrolled in this course to view its content" });
+      }
+
+      const courseData = await storage.getCourseWithContent(courseId);
+      if (!courseData) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      res.json(courseData);
+    } catch (error) {
+      console.error("Error fetching course content:", error);
+      res.status(500).json({ message: "Failed to fetch course content" });
+    }
+  });
+
+  // Start a test
+  app.post('/api/tests/:testId/start', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { testId } = req.params;
+
+      // Verify student is enrolled in a course that requires this test
+      const completionTests = await db
+        .select()
+        .from(courseCompletionTests)
+        .where(eq(courseCompletionTests.testTemplateId, testId));
+
+      if (completionTests.length === 0) {
+        return res.status(404).json({ message: "Test not found" });
+      }
+
+      // Check if student is enrolled in any of the courses that require this test
+      const courseIds = completionTests.map(cct => cct.courseId);
+      const enrollments = await storage.getEnrollmentsByStudent(userId);
+      const enrolledCourseIds = enrollments.map(e => e.courseId);
+      const hasEnrollment = courseIds.some((cid: string) => enrolledCourseIds.includes(cid));
+
+      if (!hasEnrollment) {
+        return res.status(403).json({ message: "You must be enrolled in the course to take this test" });
+      }
+
+      const result = await storage.startTest(testId, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error starting test:", error);
+      res.status(500).json({ message: "Failed to start test" });
+    }
+  });
+
+  // Submit test answers
+  app.post('/api/test-instances/:instanceId/submit', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { instanceId } = req.params;
+      const { answers } = req.body;
+
+      // Verify the test instance belongs to the user
+      const instance = await storage.getTestInstance(instanceId);
+      if (!instance || instance.studentId !== userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      if (instance.submittedAt) {
+        return res.status(400).json({ message: "Test already submitted" });
+      }
+
+      const result = await storage.submitTest(instanceId, answers);
+      res.json(result);
+    } catch (error) {
+      console.error("Error submitting test:", error);
+      res.status(500).json({ message: "Failed to submit test" });
+    }
+  });
+
+  // Get test instance/results
+  app.get('/api/test-instances/:instanceId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { instanceId } = req.params;
+
+      const instance = await storage.getTestInstance(instanceId);
+      if (!instance || instance.studentId !== userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      res.json(instance);
+    } catch (error) {
+      console.error("Error fetching test instance:", error);
+      res.status(500).json({ message: "Failed to fetch test instance" });
     }
   });
 

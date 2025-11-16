@@ -606,7 +606,7 @@ export class DatabaseStorage implements IStorage {
         id: tq.question.id,
         questionText: tq.question.questionText,
         type: tq.question.type,
-        choices: tq.question.choices,
+        choices: tq.question.choices, // Keep full choices for server-side storage
         orderIndex: tq.orderIndex,
       }));
     } else if (template.mode === 'random') {
@@ -621,7 +621,7 @@ export class DatabaseStorage implements IStorage {
         id: q.id,
         questionText: q.questionText,
         type: q.type,
-        choices: q.choices,
+        choices: q.choices, // Keep full choices for server-side storage
         orderIndex: index,
       }));
     }
@@ -634,7 +634,7 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Create test instance with questions snapshot
+    // Create test instance with questions snapshot (including correct answers for server-side validation)
     const testInstance = await this.createTestInstance({
       testTemplateId,
       studentId,
@@ -646,7 +646,16 @@ export class DatabaseStorage implements IStorage {
       submittedAt: null,
     });
 
-    return { testInstance, questions: questionsToServe };
+    // Strip correct answer flags from questions before sending to client
+    const questionsForClient = questionsToServe.map(q => ({
+      id: q.id,
+      questionText: q.questionText,
+      type: q.type,
+      choices: (q.choices as any[]).map((c: any) => ({ label: c.label })), // Remove isCorrect flag
+      orderIndex: q.orderIndex,
+    }));
+
+    return { testInstance, questions: questionsForClient };
   }
 
   async submitTest(testInstanceId: string, answers: Record<string, any>): Promise<TestInstance> {
