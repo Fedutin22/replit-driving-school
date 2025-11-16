@@ -88,9 +88,10 @@ Preferred communication style: Simple, everyday language.
 **Core Entities:**
 - `users` - Authentication and profile data with role enum (student/instructor/admin), password field (nullable, only for local auth)
 - `courses` - Course definitions with pricing, duration, requirements
-- `topics` - Course content structure (theory/practice)
-- `questions` - Question bank for assessments (single/multiple choice)
-- `testTemplates` - Test configuration (question count, passing score, mode)
+- `topics` - Course content structure with type field (theory/practice), orderIndex for sequencing
+- `posts` - Learning content within topics with HTML support, title, orderIndex for sequencing
+- `questions` - Question bank with choices array containing text and isCorrect fields (single/multiple choice)
+- `testTemplates` - Test configuration with questionCount, passingScore, mode (random/manual), randomizeQuestions flag
 - `testInstances` - Student test attempts with answers and scoring
 - `courseEnrollments` - Student-course relationships with progress tracking
 - `schedules` - Theory/practice session scheduling
@@ -104,7 +105,11 @@ Preferred communication style: Simple, everyday language.
 
 **Key Relationships:**
 - Courses have many topics, enrollments, and completion tests
-- Tests reference templates and include multiple questions
+- Topics belong to courses and contain many posts (cascade delete)
+- Posts belong to topics with HTML content field
+- Questions have answer choices with correct/incorrect flags
+- Tests reference templates and include multiple questions via testQuestions join table
+- Manual test templates support custom question selection with reordering
 - Schedules link courses, topics, and instructors
 - Enrollments track student progress and completion
 - Certificates tied to courses and students
