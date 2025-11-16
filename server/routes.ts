@@ -388,6 +388,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Topic assessment routes (student-facing)
+  app.post('/api/assessments/:assessmentId/start', isAuthenticated, async (req: any, res) => {
+    try {
+      const { assessmentId } = req.params;
+      const userId = req.user.claims.sub;
+
+      // Verify student is enrolled in the course containing this assessment
+      const assessment = await storage.getTopicAssessment(assessmentId);
+      if (!assessment) {
+        return res.status(404).json({ message: "Assessment not found" });
+      }
+
+      const topic = await storage.getTopic(assessment.topicId);
+      if (!topic) {
+        return res.status(404).json({ message: "Topic not found" });
+      }
+
+      const enrollment = await storage.getEnrollment(topic.courseId, userId);
+      if (!enrollment) {
+        return res.status(403).json({ message: "Not enrolled in this course" });
+      }
+
+      const result = await storage.startAssessment(assessmentId, userId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error starting assessment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Schedules routes
   app.get('/api/schedules', isAuthenticated, async (req: any, res) => {
     try {
@@ -1197,6 +1227,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error removing question from test:", error);
       res.status(500).json({ message: "Failed to remove question from test" });
+    }
+  });
+
+  // Topic assessment routes
+  app.get('/api/admin/topics/:topicId/assessments', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { topicId } = req.params;
+      const assessments = await storage.getTopicAssessments(topicId);
+      res.json(assessments);
+    } catch (error) {
+      console.error("Error fetching topic assessments:", error);
+      res.status(500).json({ message: "Failed to fetch topic assessments" });
+    }
+  });
+
+  app.post('/api/admin/topics/:topicId/assessments', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { topicId } = req.params;
+      const assessmentData = { ...req.body, topicId };
+      const assessment = await storage.createTopicAssessment(assessmentData);
+      res.status(201).json(assessment);
+    } catch (error: any) {
+      console.error("Error creating topic assessment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch('/api/admin/assessments/:id', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const assessment = await storage.updateTopicAssessment(id, req.body);
+      res.json(assessment);
+    } catch (error: any) {
+      console.error("Error updating topic assessment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete('/api/admin/assessments/:id', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteTopicAssessment(id);
+      res.json({ message: "Topic assessment deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting topic assessment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get('/api/admin/assessments/:assessmentId/questions', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { assessmentId } = req.params;
+      const questions = await storage.getAssessmentQuestions(assessmentId);
+      res.json(questions);
+    } catch (error) {
+      console.error("Error fetching assessment questions:", error);
+      res.status(500).json({ message: "Failed to fetch assessment questions" });
+    }
+  });
+
+  app.post('/api/admin/assessments/:assessmentId/questions', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { assessmentId } = req.params;
+      const { questionId, orderIndex } = req.body;
+      
+      const assessmentQuestion = await storage.addQuestionToAssessment(assessmentId, questionId, orderIndex);
+      res.status(201).json(assessmentQuestion);
+    } catch (error: any) {
+      console.error("Error adding question to assessment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete('/api/admin/assessments/:assessmentId/questions/:questionId', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { assessmentId, questionId } = req.params;
+      await storage.removeQuestionFromAssessment(assessmentId, questionId);
+      res.json({ message: "Question removed from assessment successfully" });
+    } catch (error: any) {
+      console.error("Error removing question from assessment:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put('/api/admin/assessments/:assessmentId/questions/reorder', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { assessmentId } = req.params;
+      const { questionOrders } = req.body;
+      
+      await storage.reorderAssessmentQuestions(assessmentId, questionOrders);
+      res.json({ message: "Questions reordered successfully" });
+    } catch (error: any) {
+      console.error("Error reordering questions:", error);
+      res.status(500).json({ message: error.message });
     }
   });
 
