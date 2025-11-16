@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Edit, Trash, FileText, List } from "lucide-react";
 import type { Course, Topic, Post } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -242,9 +243,9 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                 <List className="h-4 w-4 mr-2" />
                 Topics
               </TabsTrigger>
-              <TabsTrigger value="posts" data-testid="tab-posts" disabled={!selectedTopic}>
+              <TabsTrigger value="posts" data-testid="tab-posts">
                 <FileText className="h-4 w-4 mr-2" />
-                Posts {selectedTopic && `(${selectedTopic.name})`}
+                Posts
               </TabsTrigger>
             </TabsList>
 
@@ -286,14 +287,6 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setSelectedTopic(topic)}
-                              data-testid={`button-select-topic-${topic.id}`}
-                            >
-                              <FileText className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
                               onClick={() => handleOpenTopicDialog(topic)}
                               data-testid={`button-edit-topic-${topic.id}`}
                             >
@@ -317,16 +310,47 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
             </TabsContent>
 
             <TabsContent value="posts" className="space-y-4">
-              {selectedTopic && (
+              <div className="flex justify-between items-center gap-4">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium mb-2 block">Select Topic</Label>
+                  <Select
+                    value={selectedTopic?.id || ""}
+                    onValueChange={(value) => {
+                      const topic = topics?.find(t => t.id === value);
+                      setSelectedTopic(topic || null);
+                    }}
+                    data-testid="select-post-topic"
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a topic to manage posts" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {topics?.map((topic) => (
+                        <SelectItem key={topic.id} value={topic.id}>
+                          {topic.name} ({topic.type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedTopic && (
+                  <Button size="sm" onClick={() => handleOpenPostDialog()} data-testid="button-add-post" className="mt-6">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Post
+                  </Button>
+                )}
+              </div>
+
+              {!selectedTopic ? (
+                <p className="text-sm text-muted-foreground text-center py-12">
+                  Select a topic above to view and manage its posts
+                </p>
+              ) : (
                 <>
-                  <div className="flex justify-between items-center">
+                  <div className="flex items-center">
                     <p className="text-sm text-muted-foreground">
                       {posts?.length || 0} posts in {selectedTopic.name}
                     </p>
-                    <Button size="sm" onClick={() => handleOpenPostDialog()} data-testid="button-add-post">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Post
-                    </Button>
                   </div>
 
                   <div className="grid gap-3">
