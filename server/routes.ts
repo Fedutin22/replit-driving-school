@@ -629,6 +629,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/questions/search', isAuthenticated, async (req: any, res) => {
+    try {
+      const { q, tag, limit = '10' } = req.query;
+      const questions = await storage.searchQuestions({
+        searchTerm: q as string,
+        tag: tag as string,
+        limit: parseInt(limit as string, 10)
+      });
+      res.json(questions);
+    } catch (error) {
+      console.error("Error searching questions:", error);
+      res.status(500).json({ message: "Failed to search questions" });
+    }
+  });
+
   app.post('/api/questions', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);

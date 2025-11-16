@@ -55,8 +55,12 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ): Promise<string> {
-  // Check if user already exists by OIDC sub to preserve their role
+  // Log claims for debugging (especially helpful for testing)
+  console.log("[OIDC] Received claims:", JSON.stringify(claims, null, 2));
+  
+  // Check if user already exists by OIDC sub
   let existingUser = await storage.getUser(claims["sub"]);
+  let isExistingOidcUser = !!existingUser;
   
   // If no user exists by OIDC ID, check if email is already registered (local auth user)
   if (!existingUser && claims["email"]) {
@@ -66,14 +70,24 @@ async function upsertUser(
   // Use existing user's ID if they exist, otherwise use OIDC sub
   const userId = existingUser?.id || claims["sub"];
   
+  // Determine role:
+  // - For existing OIDC users: preserve their role (prevents OIDC from overwriting manual assignments)
+  // - For new users or local-auth-to-OIDC conversions: use role from claims
+  // - Fall back to 'student' if no role specified
+  const role = isExistingOidcUser && existingUser?.role 
+    ? existingUser.role 
+    : (claims["role"] || 'student');
+  
+  console.log("[OIDC] User type:", isExistingOidcUser ? "existing OIDC" : "new/local-to-OIDC");
+  console.log("[OIDC] Setting user role to:", role, "(from", isExistingOidcUser && existingUser?.role ? "existing" : "claims", ")");
+  
   await storage.upsertUser({
     id: userId,
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
-    // Preserve existing role, or use role from claims, or default to student
-    role: existingUser?.role || claims["role"] || 'student',
+    role: role,
   });
   
   return userId;

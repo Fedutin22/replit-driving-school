@@ -82,6 +82,7 @@ export interface IStorage {
   // Question operations
   getQuestions(): Promise<Question[]>;
   getQuestion(id: string): Promise<Question | undefined>;
+  searchQuestions(params: { searchTerm?: string; tag?: string; limit: number }): Promise<Question[]>;
   createQuestion(question: InsertQuestion): Promise<Question>;
   updateQuestion(id: string, data: Partial<Question>): Promise<Question>;
   deleteQuestion(id: string): Promise<void>;
@@ -460,6 +461,32 @@ export class DatabaseStorage implements IStorage {
   async getQuestion(id: string): Promise<Question | undefined> {
     const [question] = await db.select().from(questions).where(eq(questions.id, id));
     return question || undefined;
+  }
+
+  async searchQuestions(params: { searchTerm?: string; tag?: string; limit: number }): Promise<Question[]> {
+    const { searchTerm, tag, limit } = params;
+    
+    let query = db.select().from(questions);
+    
+    const conditions = [];
+    
+    // Add search term filter (case-insensitive)
+    if (searchTerm && searchTerm.trim()) {
+      conditions.push(sql`LOWER(${questions.questionText}) LIKE LOWER(${'%' + searchTerm + '%'})`);
+    }
+    
+    // Add tag filter
+    if (tag && tag.trim()) {
+      conditions.push(sql`${tag} = ANY(${questions.tags})`);
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    query = query.orderBy(desc(questions.createdAt)).limit(limit) as any;
+    
+    return await query;
   }
 
   async createQuestion(questionData: InsertQuestion): Promise<Question> {
