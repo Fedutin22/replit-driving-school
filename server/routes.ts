@@ -6,13 +6,24 @@ import Stripe from "stripe";
 import { z } from "zod";
 import { insertCourseSchema, insertTopicSchema, insertQuestionSchema, insertTestTemplateSchema, insertScheduleSchema } from "@shared/schema";
 import express from "express";
+import PDFDocument from "pdfkit";
+
+// CSV helper to escape fields
+function csvEscape(value: string | number | boolean | null | undefined): string {
+  if (value === null || value === undefined) return '""';
+  const str = String(value);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2025-10-29.clover",
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -127,6 +138,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching available tests:", error);
       res.status(500).json({ message: "Failed to fetch available tests" });
+    }
+  });
+
+  app.post('/api/tests/:templateId/start', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { templateId } = req.params;
+
+      const template = await storage.getTestTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ message: "Test template not found" });
+      }
+
+      let questions;
+      if (template.mode === 'random') {
+        const allQuestions = await storage.getQuestionsByCourse(template.courseId || '');
+        questions = allQuestions
+          .sort(() => Math.random() - 0.5)
+          .slice(0, template.questionCount || 10);
+      } else {
+        const testQuestions = await storage.getTestQuestions(templateId);
+        questions = testQuestions.map(tq => tq.question);
+      }
+
+      const instance = await storage.createTestInstance({
+        testTemplateId: templateId,
+        studentId: userId,
+        questionsData: questions,
+      });
+
+      res.json(instance);
+    } catch (error) {
+      console.error("Error starting test:", error);
+      res.status(500).json({ message: "Failed to start test" });
+    }
+  });
+
+  app.post('/api/tests/:instanceId/submit', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { instanceId } = req.params;
+      const { answers } = req.body;
+
+      const instance = await storage.getTestInstance(instanceId);
+      if (!instance) {
+        return res.status(404).json({ message: "Test instance not found" });
+      }
+
+      if (instance.studentId !== userId) {
+        return res.status(403).json({ message: "Not authorized to submit this test" });
+      }
+
+      if (instance.submittedAt) {
+        return res.status(400).json({ message: "Test already submitted" });
+      }
+
+      const questions = instance.questionsData as any[];
+      let correctCount = 0;
+
+      questions.forEach((question, index) => {
+        const studentAnswer = answers[question.id];
+        if (!studentAnswer) return;
+
+        if (question.type === 'single_choice') {
+          const correctChoice = question.choices.find((c: any) => c.isCorrect);
+          if (correctChoice && studentAnswer === correctChoice.label) {
+            correctCount++;
+          }
+        } else if (question.type === 'multiple_choice') {
+          const correctChoices = question.choices
+            .filter((c: any) => c.isCorrect)
+            .map((c: any) => c.label)
+            .sort();
+          const studentChoices = Array.isArray(studentAnswer) 
+            ? studentAnswer.sort() 
+            : [];
+          if (JSON.stringify(correctChoices) === JSON.stringify(studentChoices)) {
+            correctCount++;
+          }
+        }
+      });
+
+      const score = correctCount;
+      const totalQuestions = questions.length;
+      const percentage = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+      
+      const template = await storage.getTestTemplate(instance.testTemplateId);
+      const passed = percentage >= (template?.passingPercentage || 70);
+
+      const updatedInstance = await storage.updateTestInstance(instanceId, {
+        answersData: answers,
+        score,
+        percentage,
+        passed,
+        submittedAt: new Date(),
+      });
+
+      res.json(updatedInstance);
+    } catch (error) {
+      console.error("Error submitting test:", error);
+      res.status(500).json({ message: "Failed to submit test" });
     }
   });
 
@@ -246,6 +358,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/certificates/:id/download', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+
+      const certificate = await storage.getCertificate(id);
+      if (!certificate) {
+        return res.status(404).json({ message: "Certificate not found" });
+      }
+
+      if (certificate.studentId !== userId) {
+        const user = await storage.getUser(userId);
+        if (user?.role !== 'admin' && user?.role !== 'instructor') {
+          return res.status(403).json({ message: "Not authorized to download this certificate" });
+        }
+      }
+
+      const student = await storage.getUser(certificate.studentId);
+      const course = await storage.getCourse(certificate.courseId);
+
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape' });
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=certificate-${certificate.certificateNumber}.pdf`);
+      
+      doc.pipe(res);
+
+      // Certificate border
+      doc.rect(40, 40, doc.page.width - 80, doc.page.height - 80)
+        .lineWidth(2)
+        .stroke('#2563eb');
+
+      // Title
+      doc.fontSize(36)
+        .font('Helvetica-Bold')
+        .fillColor('#1e40af')
+        .text('CERTIFICATE OF COMPLETION', 0, 120, { align: 'center' });
+
+      // Presented to
+      doc.fontSize(16)
+        .font('Helvetica')
+        .fillColor('#64748b')
+        .text('This is to certify that', 0, 200, { align: 'center' });
+
+      // Student name
+      doc.fontSize(32)
+        .font('Helvetica-Bold')
+        .fillColor('#0f172a')
+        .text(student?.fullName || 'Student', 0, 240, { align: 'center' });
+
+      // Course completion text
+      doc.fontSize(16)
+        .font('Helvetica')
+        .fillColor('#64748b')
+        .text('has successfully completed the course', 0, 300, { align: 'center' });
+
+      // Course name
+      doc.fontSize(24)
+        .font('Helvetica-Bold')
+        .fillColor('#1e40af')
+        .text(course?.name || 'Course', 0, 340, { align: 'center' });
+
+      // Issue date
+      const issueDate = certificate.issuedAt.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      doc.fontSize(14)
+        .font('Helvetica')
+        .fillColor('#64748b')
+        .text(`Issued on ${issueDate}`, 0, 420, { align: 'center' });
+
+      // Certificate number
+      doc.fontSize(10)
+        .fillColor('#94a3b8')
+        .text(`Certificate No: ${certificate.certificateNumber}`, 0, 480, { align: 'center' });
+
+      // School name at bottom
+      doc.fontSize(12)
+        .font('Helvetica-Bold')
+        .fillColor('#2563eb')
+        .text('Driving School Academy', 0, doc.page.height - 100, { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      console.error("Error generating certificate PDF:", error);
+      res.status(500).json({ message: "Failed to generate certificate" });
+    }
+  });
+
   // Questions routes
   app.get('/api/questions', isAuthenticated, async (req: any, res) => {
     try {
@@ -328,6 +531,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const users = await storage.getAllUsers();
       const courses = await storage.getCourses();
+      
+      // Get all test instances
+      const allTestInstances = await Promise.all(
+        users.filter(u => u.role === 'student').map(u => storage.getTestInstancesByStudent(u.id))
+      );
+      const testInstances = allTestInstances.flat();
+      
+      // Get all certificates
+      const allCertificates = await Promise.all(
+        users.filter(u => u.role === 'student').map(u => storage.getCertificatesByStudent(u.id))
+      );
+      const certificates = allCertificates.flat();
+      
+      // Get all payments
+      const allPayments = await Promise.all(
+        users.filter(u => u.role === 'student').map(u => storage.getPaymentsByStudent(u.id))
+      );
+      const payments = allPayments.flat();
+      
+      // Get all enrollments
+      const allEnrollments = await Promise.all(
+        users.filter(u => u.role === 'student').map(u => storage.getEnrollmentsByStudent(u.id))
+      );
+      const enrollments = allEnrollments.flat();
+      
+      // Calculate revenue
+      const revenue = payments
+        .filter(p => p.status === 'paid')
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      
+      // Monthly enrollments (last 12 months)
+      const monthlyEnrollments = [];
+      const now = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = monthDate.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        const count = enrollments.filter(e => {
+          const enrollDate = new Date(e.enrolledAt);
+          return enrollDate.getMonth() === monthDate.getMonth() && 
+                 enrollDate.getFullYear() === monthDate.getFullYear();
+        }).length;
+        monthlyEnrollments.push({ month: monthName, count });
+      }
+      
+      // Test pass rates by course
+      const testPassRatesData = await Promise.all(
+        courses.slice(0, 5).map(async (course) => {
+          // Get templates for this course
+          const templates = await storage.getTestTemplates();
+          const courseTemplates = templates.filter(t => t.courseId === course.id);
+          const templateIds = courseTemplates.map(t => t.id);
+          
+          // Filter test instances for this course's templates
+          const courseTests = testInstances.filter(t => 
+            templateIds.includes(t.testTemplateId) && t.submittedAt !== null
+          );
+          
+          const passed = courseTests.filter(t => t.passed).length;
+          const total = courseTests.length;
+          const rate = total > 0 ? Math.round((passed / total) * 100) : 0;
+          return {
+            course: course.name.substring(0, 15),
+            rate
+          };
+        })
+      );
 
       const stats = {
         totalStudents: users.filter(u => u.role === 'student').length,
@@ -335,12 +604,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalInstructors: users.filter(u => u.role === 'instructor').length,
         totalCourses: courses.length,
         activeCourses: courses.filter(c => c.isActive).length,
-        totalTests: 0,
-        passedTests: 0,
-        totalCertificates: 0,
-        revenueTotal: 0,
-        monthlyEnrollments: [],
-        testPassRates: [],
+        totalTests: testInstances.filter(t => t.submittedAt).length,
+        passedTests: testInstances.filter(t => t.passed).length,
+        totalCertificates: certificates.length,
+        revenueTotal: revenue,
+        monthlyEnrollments,
+        testPassRates: testPassRatesData,
       };
 
       res.json(stats);
@@ -357,6 +626,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.get('/api/admin/export/students', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const students = users.filter(u => u.role === 'student');
+      
+      const csv = [
+        ['ID', 'Name', 'Email', 'Phone', 'Active', 'Created At'].map(csvEscape).join(','),
+        ...students.map(s => [
+          csvEscape(s.id),
+          csvEscape(s.fullName || ''),
+          csvEscape(s.email || ''),
+          csvEscape(s.phoneNumber || ''),
+          csvEscape(s.isActive ? 'Yes' : 'No'),
+          csvEscape(new Date(s.createdAt).toLocaleDateString())
+        ].join(','))
+      ].join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=students.csv');
+      res.send(csv);
+    } catch (error) {
+      console.error("Error exporting students:", error);
+      res.status(500).json({ message: "Failed to export students" });
+    }
+  });
+
+  app.get('/api/admin/export/test-results', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const allTests = await Promise.all(
+        users.filter(u => u.role === 'student').map(u => storage.getTestInstancesByStudent(u.id))
+      );
+      const tests = allTests.flat().filter(t => t.submittedAt);
+      
+      const csv = [
+        ['Student ID', 'Test Template ID', 'Score', 'Percentage', 'Passed', 'Submitted At'].map(csvEscape).join(','),
+        ...tests.map(t => [
+          csvEscape(t.studentId),
+          csvEscape(t.testTemplateId),
+          csvEscape(t.score || 0),
+          csvEscape(t.percentage || 0),
+          csvEscape(t.passed ? 'Yes' : 'No'),
+          csvEscape(t.submittedAt ? new Date(t.submittedAt).toLocaleDateString() : '')
+        ].join(','))
+      ].join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=test-results.csv');
+      res.send(csv);
+    } catch (error) {
+      console.error("Error exporting test results:", error);
+      res.status(500).json({ message: "Failed to export test results" });
     }
   });
 
@@ -453,7 +777,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (payment) {
           await storage.updatePayment(payment.id, {
-            status: 'completed',
+            status: 'paid',
+            paidAt: new Date(),
           });
 
           if (payment.courseId && payment.studentId) {

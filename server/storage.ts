@@ -62,6 +62,7 @@ export interface IStorage {
   // Question operations
   getQuestions(): Promise<Question[]>;
   getQuestion(id: string): Promise<Question | undefined>;
+  getQuestionsByCourse(courseId: string): Promise<Question[]>;
   createQuestion(question: InsertQuestion): Promise<Question>;
   updateQuestion(id: string, data: Partial<Question>): Promise<Question>;
   deleteQuestion(id: string): Promise<void>;
@@ -71,6 +72,7 @@ export interface IStorage {
   getTestTemplate(id: string): Promise<TestTemplate | undefined>;
   createTestTemplate(template: InsertTestTemplate): Promise<TestTemplate>;
   updateTestTemplate(id: string, data: Partial<TestTemplate>): Promise<TestTemplate>;
+  getTestQuestions(testTemplateId: string): Promise<any[]>;
   
   // Test instance operations
   createTestInstance(instance: InsertTestInstance): Promise<TestInstance>;
@@ -220,6 +222,14 @@ export class DatabaseStorage implements IStorage {
     await db.delete(questions).where(eq(questions.id, id));
   }
 
+  async getQuestionsByCourse(courseId: string): Promise<Question[]> {
+    return await db
+      .select()
+      .from(questions)
+      .where(eq(questions.courseId, courseId))
+      .orderBy(desc(questions.createdAt));
+  }
+
   // Test template operations
   async getTestTemplates(): Promise<TestTemplate[]> {
     return await db.select().from(testTemplates).orderBy(desc(testTemplates.createdAt));
@@ -242,6 +252,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(testTemplates.id, id))
       .returning();
     return template;
+  }
+
+  async getTestQuestions(testTemplateId: string): Promise<any[]> {
+    const testQuestionsData = await db
+      .select()
+      .from(testQuestions)
+      .where(eq(testQuestions.testTemplateId, testTemplateId))
+      .orderBy(testQuestions.orderIndex);
+
+    const questionsList = await Promise.all(
+      testQuestionsData.map(async (tq) => {
+        const [question] = await db
+          .select()
+          .from(questions)
+          .where(eq(questions.id, tq.questionId));
+        return { ...tq, question };
+      })
+    );
+
+    return questionsList;
   }
 
   // Test instance operations
