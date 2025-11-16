@@ -742,6 +742,12 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                                   {assessment.isRequired && (
                                     <Badge variant="default" data-testid={`badge-required-${assessment.id}`}>Required</Badge>
                                   )}
+                                  <Badge 
+                                    variant={assessment.status === 'published' ? 'outline' : 'secondary'} 
+                                    data-testid={`badge-status-${assessment.id}`}
+                                  >
+                                    {assessment.status === 'published' ? 'Published' : 'Draft'}
+                                  </Badge>
                                 </div>
                                 {assessment.description && (
                                   <p className="text-sm text-muted-foreground mt-1">{assessment.description}</p>
