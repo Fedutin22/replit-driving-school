@@ -89,7 +89,18 @@ Preferred communication style: Simple, everyday language.
 - Storage methods: `getSchedulesByCourse`, `getSchedule`, `createSchedule`, `updateSchedule`, `deleteSchedule`
 - API endpoints: GET/POST `/api/admin/courses/:courseId/schedules`, PATCH/DELETE `/api/admin/schedules/:id`
 - Date handling: Frontend uses datetime-local inputs (ISO strings), backend schema coerces to Date objects
-- Security: `upsertUser` validates email uniqueness and rejects conflicts to prevent account takeover
+
+**Enrollment Tracking:**
+- Admin-only enrollment overview and student progress tracking
+- Storage methods: `getEnrollmentsWithCourseDetails(studentId)` fetches student enrollments with course details via join; `getAllEnrollmentsWithDetails()` fetches all enrollments with student and course information
+- API endpoints: GET `/api/admin/users/:id/enrollments` (individual student), GET `/api/admin/enrollments` (all enrollments)
+- Frontend features: Student progress dialog in User Management (`/admin/users`) and comprehensive enrollments overview page (`/admin/enrollments`) with search functionality
+- TanStack Query pattern: Query keys use full path strings (e.g., `["/api/admin/enrollments"]`) for proper API routing
+
+**Security:**
+- `upsertUser` validates email uniqueness and rejects conflicts to prevent account takeover
+- OIDC authentication preserves existing user roles during login instead of overwriting with default role
+- Role-based access control enforced on all admin-only endpoints
 
 ### Database Schema
 
@@ -164,6 +175,7 @@ Preferred communication style: Simple, everyday language.
 - Populates database with comprehensive mock data for development and testing
 
 **Seeded Data Includes:**
+- **Admin** (1): Admin User (id: admin-user, email: admin@drivingschool.com, password: `password123`)
 - **Instructors** (2): John Doe, Jane Smith (password: `password123`)
 - **Courses** (3):
   - Beginner Driver Training ($1200, Beginner category)
