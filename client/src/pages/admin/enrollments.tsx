@@ -15,6 +15,7 @@ import { Search, CheckCircle2, GraduationCap } from "lucide-react";
 import type { User, CourseEnrollment, Course } from "@shared/schema";
 import { useState } from "react";
 import { format } from "date-fns";
+import { Link } from "wouter";
 
 type EnrollmentWithDetails = CourseEnrollment & { course: Course; student: User };
 
@@ -103,10 +104,12 @@ export default function AdminEnrollments() {
                       {enrollment.student.email}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                        <span>{enrollment.course.name}</span>
-                      </div>
+                      <Link href={`/courses/${enrollment.course.id}`} data-testid={`link-course-${enrollment.id}`}>
+                        <div className="flex items-center gap-2 hover-elevate rounded-md px-2 py-1 -mx-2 -my-1">
+                          <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-primary underline-offset-4 hover:underline">{enrollment.course.name}</span>
+                        </div>
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{enrollment.course.category}</Badge>
