@@ -169,9 +169,15 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
   // Current assessment mode for effect dependencies
   const currentMode = assessmentForm.watch("mode");
   
-  // Debounced search effect - only when in manual mode
+  // Debounced search effect - only when in manual mode AND user has typed something
   useEffect(() => {
     if (currentMode !== "manual") {
+      return;
+    }
+    
+    // Don't auto-search - only search when user has typed something
+    if (!questionSearchTerm.trim() && questionTagFilter === 'all') {
+      setSearchedQuestions([]);
       return;
     }
     
@@ -919,7 +925,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
       </Dialog>
 
       <Dialog open={isAssessmentDialogOpen} onOpenChange={setIsAssessmentDialogOpen}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className={assessmentForm.watch("mode") === "manual" ? "max-w-5xl" : "max-w-2xl"}>
           <DialogHeader>
             <DialogTitle>{editingAssessment ? "Edit Assessment" : "Create New Assessment"}</DialogTitle>
             <DialogDescription>
@@ -927,7 +933,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
             </DialogDescription>
           </DialogHeader>
           
-          <div className="md:grid md:grid-cols-[1.4fr_1fr] gap-6">
+          <div className={assessmentForm.watch("mode") === "manual" ? "md:grid md:grid-cols-[1.4fr_1fr] gap-6" : "flex flex-col gap-6"}>
             {/* Left Column: Form */}
             <Form {...assessmentForm}>
               <form onSubmit={assessmentForm.handleSubmit((data) => createOrUpdateAssessmentMutation.mutate(data))} className="space-y-4">
@@ -1128,7 +1134,9 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                     <p className="text-sm text-muted-foreground text-center py-8">Searching...</p>
                   ) : searchedQuestions.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
-                      No questions found. Try adjusting your search.
+                      {!questionSearchTerm.trim() && questionTagFilter === 'all' 
+                        ? "Start typing to search for questions or select a tag filter"
+                        : "No questions found. Try different search terms or tags."}
                     </p>
                   ) : (
                     <div className="p-2 space-y-2">
