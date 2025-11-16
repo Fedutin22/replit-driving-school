@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, BookOpen, FileText } from "lucide-react";
+import { Plus, Edit, BookOpen, FileText, Calendar } from "lucide-react";
 import type { Course } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,7 @@ export default function AdminCourses() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [managingCourse, setManagingCourse] = useState<Course | null>(null);
+  const [managingSchedules, setManagingSchedules] = useState<Course | null>(null);
 
   const { data: courses, isLoading } = useQuery<Course[]>({
     queryKey: ["/api/admin/courses"],
@@ -265,6 +266,14 @@ export default function AdminCourses() {
                           data-testid={`button-manage-content-${course.id}`}
                         >
                           <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setManagingSchedules(course)}
+                          data-testid={`button-manage-schedules-${course.id}`}
+                        >
+                          <Calendar className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
