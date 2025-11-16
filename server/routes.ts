@@ -370,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalQuestions = questions.length;
       const percentage = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
       
-      const template = await storage.getTestTemplate(instance.testTemplateId);
+      const template = instance.testTemplateId ? await storage.getTestTemplate(instance.testTemplateId) : null;
       const passed = percentage >= (template?.passingPercentage || 70);
 
       const updatedInstance = await storage.updateTestInstance(instanceId, {
@@ -724,7 +724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Filter test instances for this course's templates
           const courseTests = testInstances.filter(t => 
-            templateIds.includes(t.testTemplateId) && t.submittedAt !== null
+            t.testTemplateId && templateIds.includes(t.testTemplateId) && t.submittedAt !== null
           );
           
           const passed = courseTests.filter(t => t.passed).length;

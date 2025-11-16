@@ -28,7 +28,7 @@ const courseSchema = z.object({
 });
 
 type CourseForm = z.infer<typeof courseSchema>;
-type CourseWithScheduleCount = Course & { scheduleCount: number };
+type CourseWithScheduleCount = Course & { scheduleCount: number; topicCount: number; postCount: number };
 
 export default function AdminCourses() {
   const { toast } = useToast();
@@ -238,6 +238,8 @@ export default function AdminCourses() {
                   <TableHead>Course Name</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Price</TableHead>
+                  <TableHead>Topics</TableHead>
+                  <TableHead>Posts</TableHead>
                   <TableHead>Schedules</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -254,6 +256,12 @@ export default function AdminCourses() {
                     </TableCell>
                     <TableCell data-testid={`text-price-${course.id}`}>
                       ${course.price || "0.00"}
+                    </TableCell>
+                    <TableCell data-testid={`text-topics-${course.id}`}>
+                      {course.topicCount}
+                    </TableCell>
+                    <TableCell data-testid={`text-posts-${course.id}`}>
+                      {course.postCount}
                     </TableCell>
                     <TableCell data-testid={`text-schedules-${course.id}`}>
                       {course.scheduleCount}

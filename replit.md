@@ -89,11 +89,14 @@ Preferred communication style: Simple, everyday language.
 - Storage methods: `getSchedulesByCourse`, `getSchedule`, `createSchedule`, `updateSchedule`, `deleteSchedule`, `getSchedulesWithDetails`, `getCoursesWithScheduleCount`
 - API endpoints: GET/POST `/api/admin/courses/:courseId/schedules`, PATCH/DELETE `/api/admin/schedules/:id`, GET `/api/schedules`, GET `/api/courses` (includes schedule counts)
 - Date handling: Frontend uses datetime-local inputs (ISO strings), backend schema coerces to Date objects
-- **Course Management Schedule Count:**
-  - Course management table (`/admin/courses`) displays schedule count for each course
-  - Optimized query using LEFT JOIN and COUNT aggregation (no N+1 queries)
-  - Properly typed with `CourseWithScheduleCount` type for type safety
-  - Shows number of scheduled sessions per course at a glance
+- **Course Management Statistics:**
+  - Course management table (`/admin/courses`) displays comprehensive statistics for each course:
+    - Topic count: Number of topics in the course
+    - Post count: Total number of posts/lessons across all topics
+    - Schedule count: Number of scheduled sessions
+  - Optimized query using LEFT JOIN and COUNT DISTINCT aggregation (no N+1 queries)
+  - Properly typed with extended Course type including count fields
+  - Provides at-a-glance overview of course content and scheduling
 - **Student Course Schedule Count:**
   - Student courses page (`/courses`) displays schedule count on both enrolled and available course cards
   - Shows "X session scheduled" (singular) or "X sessions scheduled" (plural) with Calendar icon

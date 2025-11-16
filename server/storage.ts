@@ -191,20 +191,26 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(courses).orderBy(desc(courses.createdAt));
   }
 
-  async getCoursesWithScheduleCount(): Promise<Array<Course & { scheduleCount: number }>> {
+  async getCoursesWithScheduleCount(): Promise<Array<Course & { scheduleCount: number; topicCount: number; postCount: number }>> {
     const result = await db
       .select({
         course: courses,
-        scheduleCount: sql<number>`CAST(COUNT(${schedules.id}) AS INTEGER)`,
+        scheduleCount: sql<number>`CAST(COUNT(DISTINCT ${schedules.id}) AS INTEGER)`,
+        topicCount: sql<number>`CAST(COUNT(DISTINCT ${topics.id}) AS INTEGER)`,
+        postCount: sql<number>`CAST(COUNT(DISTINCT ${posts.id}) AS INTEGER)`,
       })
       .from(courses)
       .leftJoin(schedules, eq(courses.id, schedules.courseId))
+      .leftJoin(topics, eq(courses.id, topics.courseId))
+      .leftJoin(posts, eq(topics.id, posts.topicId))
       .groupBy(courses.id)
       .orderBy(desc(courses.createdAt));
     
     return result.map(row => ({
       ...row.course,
       scheduleCount: row.scheduleCount,
+      topicCount: row.topicCount,
+      postCount: row.postCount,
     }));
   }
 
@@ -649,6 +655,10 @@ export class DatabaseStorage implements IStorage {
     const instance = await this.getTestInstance(testInstanceId);
     if (!instance) {
       throw new Error('Test instance not found');
+    }
+
+    if (!instance.testTemplateId) {
+      throw new Error('Legacy test template ID not found');
     }
 
     const template = await this.getTestTemplate(instance.testTemplateId);
