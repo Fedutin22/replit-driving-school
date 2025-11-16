@@ -1,8 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GraduationCap, BookOpen, Award, Calendar, CheckCircle2 } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function Landing() {
+  const [, setLocation] = useLocation();
+  
   const features = [
     {
       icon: BookOpen,
@@ -39,9 +42,14 @@ export default function Landing() {
               <span className="text-xs text-muted-foreground">Management Platform</span>
             </div>
           </div>
-          <Button asChild data-testid="button-login">
-            <a href="/api/login">Log In</a>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setLocation("/login")} data-testid="button-login">
+              Log In
+            </Button>
+            <Button onClick={() => setLocation("/register")} data-testid="button-register">
+              Sign Up
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -54,9 +62,14 @@ export default function Landing() {
             Streamline your driving education journey from registration to certification.
             Built for students, instructors, and administrators.
           </p>
-          <Button size="lg" asChild data-testid="button-get-started">
-            <a href="/api/login">Get Started</a>
-          </Button>
+          <div className="flex gap-3 justify-center flex-wrap">
+            <Button size="lg" onClick={() => setLocation("/register")} data-testid="button-get-started">
+              Get Started
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => setLocation("/login")} data-testid="button-sign-in">
+              Sign In
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
