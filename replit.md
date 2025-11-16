@@ -83,6 +83,14 @@ Preferred communication style: Simple, everyday language.
 - Webhook support for async payment confirmations (raw body verification)
 - Payment status tracking (pending/paid/failed)
 
+**Schedule Management:**
+- Admin/instructor schedule CRUD integrated into courses page
+- Dialog-based UI pattern following course content manager design
+- Storage methods: `getSchedulesByCourse`, `getSchedule`, `createSchedule`, `updateSchedule`, `deleteSchedule`
+- API endpoints: GET/POST `/api/admin/courses/:courseId/schedules`, PATCH/DELETE `/api/admin/schedules/:id`
+- Date handling: Frontend uses datetime-local inputs (ISO strings), backend schema coerces to Date objects
+- Security: `upsertUser` validates email uniqueness and rejects conflicts to prevent account takeover
+
 ### Database Schema
 
 **Core Entities:**
