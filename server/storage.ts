@@ -60,6 +60,7 @@ export interface IStorage {
   
   // Topic operations
   getTopicsByCourse(courseId: string): Promise<Topic[]>;
+  getTopic(id: string): Promise<Topic | undefined>;
   createTopic(topic: InsertTopic): Promise<Topic>;
   updateTopic(id: string, data: Partial<Topic>): Promise<Topic>;
   deleteTopic(id: string): Promise<void>;
@@ -101,6 +102,8 @@ export interface IStorage {
   getEnrollmentsByStudent(studentId: string): Promise<CourseEnrollment[]>;
   getEnrollment(courseId: string, studentId: string): Promise<CourseEnrollment | undefined>;
   updateEnrollment(id: string, data: Partial<CourseEnrollment>): Promise<CourseEnrollment>;
+  getEnrollmentsWithCourseDetails(studentId: string): Promise<Array<CourseEnrollment & { course: Course }>>;
+  getAllEnrollmentsWithDetails(): Promise<Array<CourseEnrollment & { course: Course; student: User }>>;
   
   // Schedule operations
   getSchedules(): Promise<Schedule[]>;
@@ -211,6 +214,11 @@ export class DatabaseStorage implements IStorage {
       .from(topics)
       .where(eq(topics.courseId, courseId))
       .orderBy(topics.orderIndex);
+  }
+
+  async getTopic(id: string): Promise<Topic | undefined> {
+    const [topic] = await db.select().from(topics).where(eq(topics.id, id));
+    return topic || undefined;
   }
 
   async createTopic(topicData: InsertTopic): Promise<Topic> {
@@ -577,6 +585,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(courseEnrollments.id, id))
       .returning();
     return enrollment;
+  }
+
+  async getEnrollmentsWithCourseDetails(studentId: string): Promise<Array<CourseEnrollment & { course: Course }>> {
+    const enrollmentsData = await db
+      .select({
+        enrollment: courseEnrollments,
+        course: courses,
+      })
+      .from(courseEnrollments)
+      .innerJoin(courses, eq(courseEnrollments.courseId, courses.id))
+      .where(eq(courseEnrollments.studentId, studentId))
+      .orderBy(desc(courseEnrollments.enrolledAt));
+
+    return enrollmentsData.map(row => ({
+      ...row.enrollment,
+      course: row.course,
+    }));
+  }
+
+  async getAllEnrollmentsWithDetails(): Promise<Array<CourseEnrollment & { course: Course; student: User }>> {
+    const enrollmentsData = await db
+      .select({
+        enrollment: courseEnrollments,
+        course: courses,
+        student: users,
+      })
+      .from(courseEnrollments)
+      .innerJoin(courses, eq(courseEnrollments.courseId, courses.id))
+      .innerJoin(users, eq(courseEnrollments.studentId, users.id))
+      .orderBy(desc(courseEnrollments.enrolledAt));
+
+    return enrollmentsData.map(row => ({
+      ...row.enrollment,
+      course: row.course,
+      student: row.student,
+    }));
   }
 
   // Schedule operations

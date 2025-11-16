@@ -54,6 +54,7 @@ export function AppSidebar() {
   const adminItems = [
     { title: "Dashboard", url: "/admin", icon: BarChart3 },
     { title: "Users", url: "/admin/users", icon: Users },
+    { title: "Enrollments", url: "/admin/enrollments", icon: ClipboardList },
     { title: "Courses", url: "/admin/courses", icon: BookOpen },
     { title: "Question Bank", url: "/admin/questions", icon: FileQuestion },
     { title: "Test Templates", url: "/admin/test-templates", icon: FileText },

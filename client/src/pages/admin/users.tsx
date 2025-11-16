@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,8 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Users as UsersIcon, UserPlus, Search, MoreVertical, Ban, CheckCircle2 } from "lucide-react";
-import type { User } from "@shared/schema";
+import { Users as UsersIcon, UserPlus, Search, MoreVertical, Ban, CheckCircle2, GraduationCap, BookOpen, Calendar } from "lucide-react";
+import type { User, CourseEnrollment, Course } from "@shared/schema";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -44,14 +44,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+type EnrollmentWithCourse = CourseEnrollment & { course: Course };
+
 export default function AdminUsers() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [viewingStudent, setViewingStudent] = useState<User | null>(null);
   const [newUserRole, setNewUserRole] = useState<"student" | "instructor" | "admin">("student");
 
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
+  });
+
+  const { data: studentEnrollments, isLoading: enrollmentsLoading } = useQuery<EnrollmentWithCourse[]>({
+    queryKey: [`/api/admin/users/${viewingStudent?.id}/enrollments`],
+    enabled: !!viewingStudent && viewingStudent.role === "student",
   });
 
   const updateUserMutation = useMutation({
@@ -187,6 +195,14 @@ export default function AdminUsers() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuSeparator />
+                          {user.role === "student" && (
+                            <DropdownMenuItem
+                              onClick={() => setViewingStudent(user)}
+                              data-testid={`menu-view-${user.id}`}
+                            >
+                              View Progress
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             onClick={() => setEditingUser(user)}
                             data-testid={`menu-edit-${user.id}`}
@@ -264,6 +280,99 @@ export default function AdminUsers() {
               data-testid="button-save-role"
             >
               {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingStudent} onOpenChange={() => setViewingStudent(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" data-testid="dialog-student-progress">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5" />
+              Student Progress - {viewingStudent?.firstName} {viewingStudent?.lastName}
+            </DialogTitle>
+            <DialogDescription>
+              View enrollment status and course progress for this student
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {enrollmentsLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ) : studentEnrollments && studentEnrollments.length > 0 ? (
+              <div className="space-y-4">
+                {studentEnrollments.map((enrollment) => (
+                  <Card key={enrollment.id} data-testid={`card-enrollment-${enrollment.id}`}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <BookOpen className="h-4 w-4" />
+                            {enrollment.course.name}
+                          </CardTitle>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {enrollment.course.category}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {enrollment.completedAt ? (
+                            <Badge variant="default" className="bg-green-600">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Completed
+                            </Badge>
+                          ) : enrollment.isActive ? (
+                            <Badge variant="secondary">In Progress</Badge>
+                          ) : (
+                            <Badge variant="outline">Inactive</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5" />
+                            Enrolled
+                          </p>
+                          <p className="font-medium mt-0.5" data-testid={`text-enrolled-${enrollment.id}`}>
+                            {format(new Date(enrollment.enrolledAt), "MMM d, yyyy")}
+                          </p>
+                        </div>
+                        {enrollment.completedAt && (
+                          <div>
+                            <p className="text-muted-foreground flex items-center gap-1.5">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Completed
+                            </p>
+                            <p className="font-medium mt-0.5" data-testid={`text-completed-${enrollment.id}`}>
+                              {format(new Date(enrollment.completedAt), "MMM d, yyyy")}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      {enrollment.course.description && (
+                        <p className="text-sm text-muted-foreground border-t pt-3">
+                          {enrollment.course.description}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <GraduationCap className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No course enrollments found for this student</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingStudent(null)} data-testid="button-close-progress">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -768,6 +768,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/users/:id/enrollments', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const enrollments = await storage.getEnrollmentsWithCourseDetails(id);
+      res.json(enrollments);
+    } catch (error) {
+      console.error("Error fetching user enrollments:", error);
+      res.status(500).json({ message: "Failed to fetch user enrollments" });
+    }
+  });
+
+  app.get('/api/admin/enrollments', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const enrollments = await storage.getAllEnrollmentsWithDetails();
+      res.json(enrollments);
+    } catch (error) {
+      console.error("Error fetching all enrollments:", error);
+      res.status(500).json({ message: "Failed to fetch enrollments" });
+    }
+  });
+
   app.get('/api/admin/courses', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
     try {
       const courses = await storage.getCourses();
@@ -946,7 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           return {
             ...schedule,
-            instructorName: instructor?.name,
+            instructorName: instructor ? `${instructor.firstName} ${instructor.lastName}` : null,
             topicName: topic?.name,
             registeredCount,
           };

@@ -19,6 +19,7 @@ import Certificates from "@/pages/certificates";
 import Questions from "@/pages/questions";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
+import AdminEnrollments from "@/pages/admin/enrollments";
 import AdminCourses from "@/pages/admin/courses";
 import AdminTestTemplates from "@/pages/admin/test-templates";
 import AdminQuestions from "@/pages/admin/questions";
@@ -58,6 +59,7 @@ function Router() {
           <Route path="/questions" component={Questions} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={AdminUsers} />
+          <Route path="/admin/enrollments" component={AdminEnrollments} />
           <Route path="/admin/courses" component={AdminCourses} />
           <Route path="/admin/test-templates" component={AdminTestTemplates} />
           <Route path="/admin/questions" component={AdminQuestions} />

@@ -6,12 +6,22 @@ import bcrypt from 'bcrypt';
 async function seed() {
   console.log('Starting database seeding...');
 
-  // Create instructors
-  console.log('Creating instructors...');
+  // Create admin, instructors, and staff
+  console.log('Creating admin and instructors...');
+  const adminId = 'admin-user';
   const instructor1Id = 'instructor-john-doe';
   const instructor2Id = 'instructor-jane-smith';
   
   await db.insert(users).values([
+    {
+      id: adminId,
+      email: 'admin@drivingschool.com',
+      password: await bcrypt.hash('password123', 10),
+      firstName: 'Admin',
+      lastName: 'User',
+      role: 'admin',
+      isActive: true,
+    },
     {
       id: instructor1Id,
       email: 'john.doe@drivingschool.com',
@@ -498,6 +508,7 @@ async function seed() {
 
   console.log('Database seeding completed successfully!');
   console.log('\nSummary:');
+  console.log('- 1 Administrator');
   console.log('- 2 Instructors');
   console.log('- 3 Courses (Beginner, Advanced, Commercial)');
   console.log('- 7 Topics');
