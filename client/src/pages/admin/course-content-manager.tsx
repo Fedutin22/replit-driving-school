@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Edit, Trash, FileText, List, ArrowUp, ArrowDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { Course, Topic, Post, TopicAssessment } from "@shared/schema";
+import type { Course, Topic, Post, TopicAssessment, Question } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -41,6 +41,7 @@ const assessmentSchema = z.object({
   questionCount: z.coerce.number().min(1).default(10),
   randomizeQuestions: z.boolean().default(false),
   orderIndex: z.coerce.number().default(0),
+  questionIds: z.array(z.string()).optional(), // For manual mode
 });
 
 type TopicForm = z.infer<typeof topicSchema>;
@@ -91,6 +92,17 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
       if (!selectedTopicForAssessments) return [];
       const response = await fetch(`/api/admin/topics/${selectedTopicForAssessments.id}/assessments`);
       if (!response.ok) throw new Error("Failed to fetch assessments");
+      return response.json();
+    },
+    enabled: !!selectedTopicForAssessments,
+  });
+
+  // Fetch all questions for manual mode selection
+  const { data: allQuestions = [] } = useQuery<Question[]>({
+    queryKey: ["/api/questions"],
+    queryFn: async () => {
+      const response = await fetch("/api/questions");
+      if (!response.ok) throw new Error("Failed to fetch questions");
       return response.json();
     },
     enabled: !!selectedTopicForAssessments,
@@ -353,9 +365,24 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
     },
   });
 
-  const handleOpenAssessmentDialog = (assessment?: TopicAssessment) => {
+  const handleOpenAssessmentDialog = async (assessment?: TopicAssessment) => {
     if (assessment) {
       setEditingAssessment(assessment);
+      
+      // Fetch questionIds if manual mode
+      let questionIds: string[] = [];
+      if (assessment.mode === "manual") {
+        try {
+          const response = await fetch(`/api/admin/assessments/${assessment.id}/questions`);
+          if (response.ok) {
+            const data = await response.json();
+            questionIds = data.questionIds || [];
+          }
+        } catch (error) {
+          console.error("Error loading question IDs:", error);
+        }
+      }
+      
       assessmentForm.reset({
         name: assessment.name,
         description: assessment.description || "",
@@ -365,6 +392,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
         questionCount: assessment.questionCount || 10,
         randomizeQuestions: assessment.randomizeQuestions,
         orderIndex: assessment.orderIndex,
+        questionIds: questionIds,
       });
     } else {
       setEditingAssessment(null);
@@ -380,6 +408,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
         questionCount: 10,
         randomizeQuestions: false,
         orderIndex: maxOrderIndex + 1,
+        questionIds: [],
       });
     }
     setIsAssessmentDialogOpen(true);
@@ -976,6 +1005,58 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                   </FormItem>
                 )}
               />
+
+              {assessmentForm.watch("mode") === "manual" && (
+                <FormField
+                  control={assessmentForm.control}
+                  name="questionIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Select Questions</FormLabel>
+                      <FormControl>
+                        <div className="border rounded-md p-4 max-h-64 overflow-y-auto space-y-2" data-testid="question-selector">
+                          {allQuestions.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No questions available. Create questions first.</p>
+                          ) : (
+                            allQuestions.map((question) => (
+                              <div key={question.id} className="flex items-start space-x-2">
+                                <input
+                                  type="checkbox"
+                                  checked={field.value?.includes(question.id) || false}
+                                  onChange={(e) => {
+                                    const currentIds = field.value || [];
+                                    if (e.target.checked) {
+                                      field.onChange([...currentIds, question.id]);
+                                    } else {
+                                      field.onChange(currentIds.filter((id: string) => id !== question.id));
+                                    }
+                                  }}
+                                  data-testid={`checkbox-question-${question.id}`}
+                                  className="h-4 w-4 mt-1"
+                                />
+                                <label className="text-sm flex-1 cursor-pointer">
+                                  {question.questionText}
+                                  {Array.isArray(question.tags) && question.tags.length > 0 && (
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      ({question.tags.join(", ")})
+                                    </span>
+                                  )}
+                                </label>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                      {field.value && field.value.length > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          {field.value.length} question{field.value.length !== 1 ? "s" : ""} selected
+                        </p>
+                      )}
+                    </FormItem>
+                  )}
+                />
+              )}
               <DialogFooter>
                 <Button
                   type="button"

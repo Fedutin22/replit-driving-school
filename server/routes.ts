@@ -1265,6 +1265,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get question IDs for an assessment (for editing manual assessments)
+  app.get('/api/admin/assessments/:id/questions', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const assessmentQuestions = await storage.getAssessmentQuestions(id);
+      const questionIds = assessmentQuestions.map(aq => aq.questionId);
+      res.json({ questionIds });
+    } catch (error: any) {
+      console.error("Error fetching assessment questions:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.delete('/api/admin/assessments/:id', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
     try {
       const { id } = req.params;

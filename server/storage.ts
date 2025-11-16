@@ -592,17 +592,49 @@ export class DatabaseStorage implements IStorage {
     return assessment || undefined;
   }
 
-  async createTopicAssessment(assessmentData: InsertTopicAssessment): Promise<TopicAssessment> {
-    const [assessment] = await db.insert(topicAssessments).values(assessmentData).returning();
+  async createTopicAssessment(assessmentData: InsertTopicAssessment & { questionIds?: string[] }): Promise<TopicAssessment> {
+    const { questionIds, ...assessmentFields } = assessmentData as any;
+    const [assessment] = await db.insert(topicAssessments).values(assessmentFields).returning();
+    
+    // If manual mode and questionIds provided, save them
+    if (questionIds && Array.isArray(questionIds) && questionIds.length > 0) {
+      await db.insert(topicAssessmentQuestions).values(
+        questionIds.map((questionId, index) => ({
+          assessmentId: assessment.id,
+          questionId,
+          orderIndex: index,
+        }))
+      );
+    }
+    
     return assessment;
   }
 
-  async updateTopicAssessment(id: string, data: Partial<TopicAssessment>): Promise<TopicAssessment> {
+  async updateTopicAssessment(id: string, data: Partial<TopicAssessment> & { questionIds?: string[] }): Promise<TopicAssessment> {
+    const { questionIds, ...assessmentFields } = data as any;
     const [assessment] = await db
       .update(topicAssessments)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...assessmentFields, updatedAt: new Date() })
       .where(eq(topicAssessments.id, id))
       .returning();
+    
+    // If questionIds provided, replace existing question assignments
+    if (questionIds !== undefined && Array.isArray(questionIds)) {
+      // Delete existing questions
+      await db.delete(topicAssessmentQuestions).where(eq(topicAssessmentQuestions.assessmentId, id));
+      
+      // Insert new questions if any
+      if (questionIds.length > 0) {
+        await db.insert(topicAssessmentQuestions).values(
+          questionIds.map((questionId, index) => ({
+            assessmentId: id,
+            questionId,
+            orderIndex: index,
+          }))
+        );
+      }
+    }
+    
     return assessment;
   }
 
