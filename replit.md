@@ -86,9 +86,18 @@ Preferred communication style: Simple, everyday language.
 **Schedule Management:**
 - Admin/instructor schedule CRUD integrated into courses page
 - Dialog-based UI pattern following course content manager design
-- Storage methods: `getSchedulesByCourse`, `getSchedule`, `createSchedule`, `updateSchedule`, `deleteSchedule`
-- API endpoints: GET/POST `/api/admin/courses/:courseId/schedules`, PATCH/DELETE `/api/admin/schedules/:id`
+- Storage methods: `getSchedulesByCourse`, `getSchedule`, `createSchedule`, `updateSchedule`, `deleteSchedule`, `getSchedulesWithDetails`
+- API endpoints: GET/POST `/api/admin/courses/:courseId/schedules`, PATCH/DELETE `/api/admin/schedules/:id`, GET `/api/schedules`
 - Date handling: Frontend uses datetime-local inputs (ISO strings), backend schema coerces to Date objects
+- **Schedule Calendar Feature:**
+  - Weekly calendar view accessible via `/schedule` (students), `/instructor/schedule` (instructors), `/admin/schedule` (admins)
+  - Role-based filtering: Students see only schedules for enrolled courses; instructors/admins see all schedules
+  - Interactive calendar with 7-day weekly grid (Monday-Sunday), navigation buttons (Previous Week, Today, Next Week)
+  - Schedule cards display: session title, course name, start/end time, instructor name, location, capacity/registration count
+  - Student registration: Students can register/unregister for upcoming sessions directly from calendar
+  - Capacity enforcement: Backend validates capacity limits and prevents duplicate registrations via `registerForSession`
+  - Real-time status indicators: "Registered" badge for enrolled sessions, "Full" badge for at-capacity sessions
+  - Current day highlighting with primary color for easy orientation
 
 **Enrollment Tracking:**
 - Admin-only enrollment overview and student progress tracking
@@ -100,7 +109,14 @@ Preferred communication style: Simple, everyday language.
 **Security:**
 - `upsertUser` validates email uniqueness and rejects conflicts to prevent account takeover
 - OIDC authentication preserves existing user roles during login instead of overwriting with default role
+- **Account Unification:** When a user logs in via OIDC but already exists as local auth user (same email), the system merges the accounts by:
+  - Checking for existing user by OIDC sub claim first
+  - If not found, checking by email to find local auth users
+  - Using the existing user's ID instead of creating a new account
+  - Updating session claims.sub to match the unified user ID for consistency across both auth methods
+  - This allows seamless switching between OIDC and local auth while preserving user data and role
 - Role-based access control enforced on all admin-only endpoints
+- Session registration capacity enforcement: `registerForSession` validates schedule exists, checks for duplicate registration, and verifies available capacity before allowing registration
 
 ### Database Schema
 

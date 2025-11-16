@@ -730,6 +730,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async registerForSession(scheduleId: string, studentId: string): Promise<void> {
+    // Check if already registered
+    const alreadyRegistered = await this.isStudentRegistered(scheduleId, studentId);
+    if (alreadyRegistered) {
+      throw new Error("Already registered for this session");
+    }
+
+    // Check capacity
+    const schedule = await this.getSchedule(scheduleId);
+    if (!schedule) {
+      throw new Error("Schedule not found");
+    }
+
+    const currentCount = await this.getSessionRegistrationCount(scheduleId);
+    if (currentCount >= schedule.capacity) {
+      throw new Error("Session is full");
+    }
+
     await db.insert(sessionRegistrations).values({ scheduleId, studentId });
   }
 

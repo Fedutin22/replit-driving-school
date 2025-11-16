@@ -54,12 +54,20 @@ function updateUserSession(
 
 async function upsertUser(
   claims: any,
-) {
-  // Check if user already exists to preserve their role
-  const existingUser = await storage.getUser(claims["sub"]);
+): Promise<string> {
+  // Check if user already exists by OIDC sub to preserve their role
+  let existingUser = await storage.getUser(claims["sub"]);
+  
+  // If no user exists by OIDC ID, check if email is already registered (local auth user)
+  if (!existingUser && claims["email"]) {
+    existingUser = await storage.getUserByEmail(claims["email"]);
+  }
+  
+  // Use existing user's ID if they exist, otherwise use OIDC sub
+  const userId = existingUser?.id || claims["sub"];
   
   await storage.upsertUser({
-    id: claims["sub"],
+    id: userId,
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
@@ -67,6 +75,8 @@ async function upsertUser(
     // Preserve existing role if user exists, otherwise default to student
     role: existingUser?.role || 'student',
   });
+  
+  return userId;
 }
 
 export async function setupAuth(app: Express) {
@@ -83,7 +93,13 @@ export async function setupAuth(app: Express) {
   ) => {
     const user = {};
     updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
+    const userId = await upsertUser(tokens.claims());
+    // Update the user object with the correct user ID (may differ from OIDC sub if merging accounts)
+    (user as any).id = userId;
+    // Also update claims.sub to maintain consistency with local auth
+    if ((user as any).claims) {
+      (user as any).claims.sub = userId;
+    }
     verified(null, user);
   };
 
