@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Edit, Trash, FileText, List, ArrowUp, ArrowDown } from "lucide-react";
-import type { Course, Topic, Post } from "@shared/schema";
+import type { Course, Topic, Post, TopicAssessment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -276,7 +276,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
           </DialogHeader>
 
           <Tabs defaultValue="topics" className="mt-4">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="topics" data-testid="tab-topics">
                 <List className="h-4 w-4 mr-2" />
                 Topics
@@ -284,6 +284,10 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
               <TabsTrigger value="posts" data-testid="tab-posts">
                 <FileText className="h-4 w-4 mr-2" />
                 Posts
+              </TabsTrigger>
+              <TabsTrigger value="assessments" data-testid="tab-assessments">
+                <FileText className="h-4 w-4 mr-2" />
+                Assessments
               </TabsTrigger>
             </TabsList>
 
