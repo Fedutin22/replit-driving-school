@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
 import Stripe from "stripe";
 import { z } from "zod";
-import { insertCourseSchema, insertTopicSchema, insertQuestionSchema, insertTestTemplateSchema, insertScheduleSchema } from "@shared/schema";
+import { insertCourseSchema, insertTopicSchema, insertPostSchema, insertQuestionSchema, insertTestTemplateSchema, insertScheduleSchema } from "@shared/schema";
 import express from "express";
 import PDFDocument from "pdfkit";
 import bcrypt from "bcrypt";
@@ -546,7 +546,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await storage.getUser(req.user.claims.sub);
       const { id } = req.params;
-      const question = await storage.updateQuestion(id, req.body);
+      const questionData = insertQuestionSchema.partial().parse(req.body);
+      const question = await storage.updateQuestion(id, questionData);
 
       if (user) {
         await storage.createAuditLog({
@@ -811,6 +812,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching topics:", error);
       res.status(500).json({ message: "Failed to fetch topics" });
+    }
+  });
+
+  // Admin test template routes
+  app.get('/api/admin/test-templates', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const templates = await storage.getTestTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching test templates:", error);
+      res.status(500).json({ message: "Failed to fetch test templates" });
+    }
+  });
+
+  app.post('/api/admin/test-templates', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const templateData = insertTestTemplateSchema.parse(req.body);
+      const template = await storage.createTestTemplate(templateData);
+      res.json(template);
+    } catch (error) {
+      console.error("Error creating test template:", error);
+      res.status(500).json({ message: "Failed to create test template" });
+    }
+  });
+
+  app.patch('/api/admin/test-templates/:id', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.updateTestTemplate(id, req.body);
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating test template:", error);
+      res.status(500).json({ message: "Failed to update test template" });
+    }
+  });
+
+  app.get('/api/admin/test-templates/:id/questions', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const questions = await storage.getTestQuestions(id);
+      res.json(questions);
+    } catch (error) {
+      console.error("Error fetching test questions:", error);
+      res.status(500).json({ message: "Failed to fetch test questions" });
+    }
+  });
+
+  app.post('/api/admin/test-templates/:id/questions', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { questionId, orderIndex } = req.body;
+      
+      if (!questionId) {
+        return res.status(400).json({ message: "Question ID required" });
+      }
+      
+      const testQuestion = await storage.addQuestionToTest(id, questionId, orderIndex || 0);
+      res.json(testQuestion);
+    } catch (error) {
+      console.error("Error adding question to test:", error);
+      res.status(500).json({ message: "Failed to add question to test" });
+    }
+  });
+
+  app.delete('/api/admin/test-templates/:id/questions/:questionId', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
+    try {
+      const { id, questionId } = req.params;
+      await storage.removeQuestionFromTest(id, questionId);
+      res.json({ message: "Question removed successfully" });
+    } catch (error) {
+      console.error("Error removing question from test:", error);
+      res.status(500).json({ message: "Failed to remove question from test" });
     }
   });
 

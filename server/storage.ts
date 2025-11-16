@@ -73,7 +73,10 @@ export interface IStorage {
   getTestTemplatesByCourse(courseId: string): Promise<TestTemplate[]>;
   createTestTemplate(template: InsertTestTemplate): Promise<TestTemplate>;
   updateTestTemplate(id: string, data: Partial<TestTemplate>): Promise<TestTemplate>;
-  getTestQuestions(testTemplateId: string): Promise<any[]>;
+  getTestQuestions(testTemplateId: string): Promise<Array<{ id: string; testTemplateId: string; questionId: string; orderIndex: number; question: Question }>>;
+  addQuestionToTest(testTemplateId: string, questionId: string, orderIndex: number): Promise<any>;
+  removeQuestionFromTest(testTemplateId: string, questionId: string): Promise<void>;
+  reorderTestQuestions(testTemplateId: string, questionOrders: Array<{questionId: string, orderIndex: number}>): Promise<void>;
   
   // Test instance operations
   createTestInstance(instance: InsertTestInstance): Promise<TestInstance>;
@@ -270,7 +273,7 @@ export class DatabaseStorage implements IStorage {
     return template;
   }
 
-  async getTestQuestions(testTemplateId: string): Promise<any[]> {
+  async getTestQuestions(testTemplateId: string): Promise<Array<{ id: string; testTemplateId: string; questionId: string; orderIndex: number; question: Question }>> {
     const testQuestionsData = await db
       .select()
       .from(testQuestions)
@@ -283,11 +286,56 @@ export class DatabaseStorage implements IStorage {
           .select()
           .from(questions)
           .where(eq(questions.id, tq.questionId));
-        return { ...tq, question };
+        return {
+          id: tq.id,
+          testTemplateId: tq.testTemplateId,
+          questionId: tq.questionId,
+          orderIndex: tq.orderIndex,
+          question: question as Question,
+        };
       })
     );
 
     return questionsList;
+  }
+
+  async addQuestionToTest(testTemplateId: string, questionId: string, orderIndex: number): Promise<any> {
+    const [testQuestion] = await db
+      .insert(testQuestions)
+      .values({
+        testTemplateId,
+        questionId,
+        orderIndex,
+      })
+      .returning();
+    return testQuestion;
+  }
+
+  async removeQuestionFromTest(testTemplateId: string, questionId: string): Promise<void> {
+    await db
+      .delete(testQuestions)
+      .where(
+        and(
+          eq(testQuestions.testTemplateId, testTemplateId),
+          eq(testQuestions.questionId, questionId)
+        )
+      );
+  }
+
+  async reorderTestQuestions(testTemplateId: string, questionOrders: Array<{questionId: string, orderIndex: number}>): Promise<void> {
+    await Promise.all(
+      questionOrders.map(({ questionId, orderIndex }) =>
+        db
+          .update(testQuestions)
+          .set({ orderIndex })
+          .where(
+            and(
+              eq(testQuestions.testTemplateId, testTemplateId),
+              eq(testQuestions.questionId, questionId)
+            )
+          )
+      )
+    );
   }
 
   // Test instance operations

@@ -5,24 +5,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, FileText } from "lucide-react";
-import type { TestTemplate } from "@shared/schema";
+import { Plus, Edit, FileText, List, X } from "lucide-react";
+import type { TestTemplate, Question } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 
 const testTemplateSchema = z.object({
   name: z.string().min(1, "Template name is required"),
   description: z.string().optional(),
   mode: z.enum(["random", "manual"]),
   questionCount: z.string().optional(),
+  randomizeQuestions: z.boolean().default(false),
   passingPercentage: z.string().min(1, "Passing percentage is required"),
 });
 
@@ -32,9 +34,44 @@ export default function AdminTestTemplates() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TestTemplate | null>(null);
+  const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<TestTemplate | null>(null);
 
   const { data: templates, isLoading } = useQuery<TestTemplate[]>({
     queryKey: ["/api/admin/test-templates"],
+  });
+
+  const { data: allQuestions } = useQuery<Question[]>({
+    queryKey: ["/api/questions"],
+  });
+
+  const { data: templateQuestions } = useQuery<any[]>({
+    queryKey: ["/api/admin/test-templates", selectedTemplate?.id, "questions"],
+    enabled: !!selectedTemplate,
+  });
+
+  const addQuestionMutation = useMutation({
+    mutationFn: async ({ templateId, questionId }: { templateId: string; questionId: string }) => {
+      const currentCount = templateQuestions?.length || 0;
+      await apiRequest("POST", `/api/admin/test-templates/${templateId}/questions`, {
+        questionId,
+        orderIndex: currentCount,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/test-templates", selectedTemplate?.id, "questions"] });
+      toast({ title: "Question Added", description: "Question added to template successfully" });
+    },
+  });
+
+  const removeQuestionMutation = useMutation({
+    mutationFn: async ({ templateId, questionId }: { templateId: string; questionId: string }) => {
+      await apiRequest("DELETE", `/api/admin/test-templates/${templateId}/questions/${questionId}`, undefined);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/test-templates", selectedTemplate?.id, "questions"] });
+      toast({ title: "Question Removed", description: "Question removed from template successfully" });
+    },
   });
 
   const form = useForm<TestTemplateForm>({
@@ -44,6 +81,7 @@ export default function AdminTestTemplates() {
       description: "",
       mode: "manual",
       questionCount: "10",
+      randomizeQuestions: false,
       passingPercentage: "70",
     },
   });
@@ -53,6 +91,7 @@ export default function AdminTestTemplates() {
       const payload = {
         ...data,
         questionCount: data.questionCount ? parseInt(data.questionCount) : null,
+        randomizeQuestions: data.randomizeQuestions,
         passingPercentage: parseInt(data.passingPercentage),
       };
       
@@ -89,11 +128,19 @@ export default function AdminTestTemplates() {
         description: template.description || "",
         mode: template.mode,
         questionCount: template.questionCount?.toString() || "10",
+        randomizeQuestions: template.randomizeQuestions || false,
         passingPercentage: template.passingPercentage.toString(),
       });
     } else {
       setEditingTemplate(null);
-      form.reset();
+      form.reset({
+        name: "",
+        description: "",
+        mode: "manual",
+        questionCount: "10",
+        randomizeQuestions: false,
+        passingPercentage: "70",
+      });
     }
     setIsDialogOpen(true);
   };
@@ -222,6 +269,29 @@ export default function AdminTestTemplates() {
                     )}
                   />
                 )}
+                <FormField
+                  control={form.control}
+                  name="randomizeQuestions"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-randomize-questions"
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          Randomize Question Order
+                        </FormLabel>
+                        <FormDescription className="text-xs">
+                          Shuffle questions each time the test is taken
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
                 <DialogFooter>
                   <Button
                     type="button"
@@ -287,14 +357,29 @@ export default function AdminTestTemplates() {
                       {template.passingPercentage}%
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenDialog(template)}
-                        data-testid={`button-edit-template-${template.id}`}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenDialog(template)}
+                          data-testid={`button-edit-template-${template.id}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {template.mode === "manual" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedTemplate(template);
+                              setQuestionDialogOpen(true);
+                            }}
+                            data-testid={`button-manage-questions-${template.id}`}
+                          >
+                            <List className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -303,6 +388,72 @@ export default function AdminTestTemplates() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={questionDialogOpen} onOpenChange={setQuestionDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Questions - {selectedTemplate?.name}</DialogTitle>
+            <DialogDescription>
+              Add questions from the question bank to this manual test template
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Selected Questions ({templateQuestions?.length || 0})</h3>
+              {templateQuestions && templateQuestions.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                  {templateQuestions.map((tq: any) => (
+                    <div key={tq.id} className="flex items-start gap-2 p-2 bg-muted rounded-md" data-testid={`selected-question-${tq.questionId}`}>
+                      <div className="flex-1 text-sm">{tq.question?.questionText}</div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeQuestionMutation.mutate({ templateId: selectedTemplate!.id, questionId: tq.questionId })}
+                        disabled={removeQuestionMutation.isPending}
+                        data-testid={`button-remove-${tq.questionId}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No questions selected yet</p>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Available Questions</h3>
+              <div className="space-y-2 max-h-64 overflow-y-auto border rounded-md p-3">
+                {allQuestions?.filter(q => !templateQuestions?.some(tq => tq.questionId === q.id)).map((question) => (
+                  <div key={question.id} className="flex items-start gap-2 p-2 hover-elevate rounded-md" data-testid={`available-question-${question.id}`}>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{question.questionText}</div>
+                      <Badge variant="secondary" className="text-xs mt-1">{question.type}</Badge>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addQuestionMutation.mutate({ templateId: selectedTemplate!.id, questionId: question.id })}
+                      disabled={addQuestionMutation.isPending}
+                      data-testid={`button-add-${question.id}`}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setQuestionDialogOpen(false)} data-testid="button-close-questions">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

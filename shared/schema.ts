@@ -96,6 +96,25 @@ export const topicsRelations = relations(topics, ({ one, many }) => ({
     references: [courses.id],
   }),
   schedules: many(schedules),
+  posts: many(posts),
+}));
+
+// Posts table (course content within topics)
+export const posts = pgTable("posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  topicId: varchar("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(), // HTML content
+  orderIndex: integer("order_index").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const postsRelations = relations(posts, ({ one }) => ({
+  topic: one(topics, {
+    fields: [posts.topicId],
+    references: [topics.id],
+  }),
 }));
 
 // Questions table - Standalone question bank (not linked to courses or topics)
@@ -122,6 +141,7 @@ export const testTemplates = pgTable("test_templates", {
   description: text("description"),
   mode: testModeEnum("mode").notNull(),
   questionCount: integer("question_count"), // For random mode
+  randomizeQuestions: boolean("randomize_questions").notNull().default(false), // Randomize question order
   passingPercentage: integer("passing_percentage").notNull().default(70),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -380,6 +400,9 @@ export type Course = typeof courses.$inferSelect;
 export type InsertTopic = typeof topics.$inferInsert;
 export type Topic = typeof topics.$inferSelect;
 
+export type InsertPost = typeof posts.$inferInsert;
+export type Post = typeof posts.$inferSelect;
+
 export type InsertQuestion = typeof questions.$inferInsert;
 export type Question = typeof questions.$inferSelect;
 
@@ -427,6 +450,12 @@ export const insertCourseSchema = createInsertSchema(courses).omit({
 });
 
 export const insertTopicSchema = createInsertSchema(topics).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPostSchema = createInsertSchema(posts).omit({
   id: true,
   createdAt: true,
   updatedAt: true,

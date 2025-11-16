@@ -6,22 +6,29 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, HelpCircle, Trash2 } from "lucide-react";
+import { Plus, Edit, HelpCircle, Trash2, X } from "lucide-react";
 import type { Question } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 
 const questionSchema = z.object({
   questionText: z.string().min(1, "Question text is required"),
   explanation: z.string().optional(),
   type: z.enum(["single_choice", "multiple_choice"]),
+  choices: z.array(z.object({
+    label: z.string().min(1, "Choice text is required"),
+    isCorrect: z.boolean(),
+  })).min(2, "At least 2 choices required").refine((choices) => choices.some(c => c.isCorrect), {
+    message: "At least one choice must be marked as correct",
+  }),
 });
 
 type QuestionForm = z.infer<typeof questionSchema>;
@@ -41,19 +48,22 @@ export default function AdminQuestions() {
       questionText: "",
       explanation: "",
       type: "single_choice",
+      choices: [
+        { label: "", isCorrect: false },
+        { label: "", isCorrect: false },
+      ],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "choices",
   });
 
   const createOrUpdateMutation = useMutation({
     mutationFn: async (data: QuestionForm) => {
       const payload = {
         ...data,
-        choices: [
-          { label: "Option A", isCorrect: true },
-          { label: "Option B", isCorrect: false },
-          { label: "Option C", isCorrect: false },
-          { label: "Option D", isCorrect: false },
-        ],
         tags: [],
       };
       
@@ -109,12 +119,44 @@ export default function AdminQuestions() {
         questionText: question.questionText,
         explanation: question.explanation || "",
         type: question.type,
+        choices: Array.isArray(question.choices) ? question.choices as Array<{label: string, isCorrect: boolean}> : [
+          { label: "", isCorrect: false },
+          { label: "", isCorrect: false },
+        ],
       });
     } else {
       setEditingQuestion(null);
-      form.reset();
+      form.reset({
+        questionText: "",
+        explanation: "",
+        type: "single_choice",
+        choices: [
+          { label: "", isCorrect: false },
+          { label: "", isCorrect: false },
+        ],
+      });
     }
     setIsDialogOpen(true);
+  };
+
+  const handleToggleCorrect = (index: number) => {
+    const currentType = form.watch("type");
+    const currentChoices = form.watch("choices");
+    
+    if (currentType === "single_choice") {
+      const updatedChoices = currentChoices.map((choice, i) => ({
+        ...choice,
+        isCorrect: i === index,
+      }));
+      form.setValue("choices", updatedChoices);
+    } else {
+      const updatedChoices = [...currentChoices];
+      updatedChoices[index] = {
+        ...updatedChoices[index],
+        isCorrect: !updatedChoices[index].isCorrect,
+      };
+      form.setValue("choices", updatedChoices);
+    }
   };
 
   const handleSubmit = (data: QuestionForm) => {
@@ -222,6 +264,69 @@ export default function AdminQuestions() {
                     </FormItem>
                   )}
                 />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Answer Choices</FormLabel>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => append({ label: "", isCorrect: false })}
+                      data-testid="button-add-choice"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Choice
+                    </Button>
+                  </div>
+                  <FormDescription className="text-xs">
+                    {form.watch("type") === "single_choice" 
+                      ? "Mark one choice as correct" 
+                      : "Mark one or more choices as correct"}
+                  </FormDescription>
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="flex items-start gap-2">
+                      <div className="flex items-center pt-2">
+                        <Checkbox
+                          checked={form.watch(`choices.${index}.isCorrect`)}
+                          onCheckedChange={() => handleToggleCorrect(index)}
+                          data-testid={`checkbox-choice-correct-${index}`}
+                        />
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name={`choices.${index}.label`}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder={`Choice ${index + 1}`}
+                                data-testid={`input-choice-${index}`}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {fields.length > 2 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => remove(index)}
+                          data-testid={`button-remove-choice-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  {form.formState.errors.choices?.message && (
+                    <p className="text-sm text-destructive">{form.formState.errors.choices.message}</p>
+                  )}
+                </div>
+
                 <DialogFooter>
                   <Button
                     type="button"
