@@ -815,6 +815,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/admin/topics', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const topicData = insertTopicSchema.parse(req.body);
+      const topic = await storage.createTopic(topicData);
+      res.json(topic);
+    } catch (error) {
+      console.error("Error creating topic:", error);
+      res.status(500).json({ message: "Failed to create topic" });
+    }
+  });
+
+  app.patch('/api/admin/topics/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const topicData = insertTopicSchema.partial().parse(req.body);
+      const topic = await storage.updateTopic(id, topicData);
+      res.json(topic);
+    } catch (error) {
+      console.error("Error updating topic:", error);
+      res.status(500).json({ message: "Failed to update topic" });
+    }
+  });
+
+  app.delete('/api/admin/topics/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteTopic(id);
+      res.json({ message: "Topic deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting topic:", error);
+      res.status(500).json({ message: "Failed to delete topic" });
+    }
+  });
+
+  app.get('/api/posts', isAuthenticated, async (req: any, res) => {
+    try {
+      const { topicId } = req.query;
+      if (!topicId || typeof topicId !== 'string') {
+        return res.status(400).json({ message: "Topic ID required" });
+      }
+
+      const posts = await storage.getPostsByTopic(topicId);
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      res.status(500).json({ message: "Failed to fetch posts" });
+    }
+  });
+
+  app.post('/api/admin/posts', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const postData = insertPostSchema.parse(req.body);
+      const post = await storage.createPost(postData);
+      res.json(post);
+    } catch (error) {
+      console.error("Error creating post:", error);
+      res.status(500).json({ message: "Failed to create post" });
+    }
+  });
+
+  app.patch('/api/admin/posts/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const postData = insertPostSchema.partial().parse(req.body);
+      const post = await storage.updatePost(id, postData);
+      res.json(post);
+    } catch (error) {
+      console.error("Error updating post:", error);
+      res.status(500).json({ message: "Failed to update post" });
+    }
+  });
+
+  app.delete('/api/admin/posts/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePost(id);
+      res.json({ message: "Post deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      res.status(500).json({ message: "Failed to delete post" });
+    }
+  });
+
   // Admin test template routes
   app.get('/api/admin/test-templates', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
     try {

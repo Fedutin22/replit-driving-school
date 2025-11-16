@@ -2,6 +2,7 @@ import {
   users,
   courses,
   topics,
+  posts,
   questions,
   testTemplates,
   testQuestions,
@@ -21,6 +22,8 @@ import {
   type Course,
   type InsertTopic,
   type Topic,
+  type InsertPost,
+  type Post,
   type InsertQuestion,
   type Question,
   type InsertTestTemplate,
@@ -59,6 +62,13 @@ export interface IStorage {
   getTopicsByCourse(courseId: string): Promise<Topic[]>;
   createTopic(topic: InsertTopic): Promise<Topic>;
   updateTopic(id: string, data: Partial<Topic>): Promise<Topic>;
+  deleteTopic(id: string): Promise<void>;
+  
+  // Post operations
+  getPostsByTopic(topicId: string): Promise<Post[]>;
+  createPost(post: InsertPost): Promise<Post>;
+  updatePost(id: string, data: Partial<Post>): Promise<Post>;
+  deletePost(id: string): Promise<void>;
   
   // Question operations
   getQuestions(): Promise<Question[]>;
@@ -201,6 +211,37 @@ export class DatabaseStorage implements IStorage {
       .where(eq(topics.id, id))
       .returning();
     return topic;
+  }
+
+  async deleteTopic(id: string): Promise<void> {
+    await db.delete(topics).where(eq(topics.id, id));
+  }
+
+  // Post operations
+  async getPostsByTopic(topicId: string): Promise<Post[]> {
+    return await db
+      .select()
+      .from(posts)
+      .where(eq(posts.topicId, topicId))
+      .orderBy(posts.orderIndex);
+  }
+
+  async createPost(postData: InsertPost): Promise<Post> {
+    const [post] = await db.insert(posts).values(postData).returning();
+    return post;
+  }
+
+  async updatePost(id: string, data: Partial<Post>): Promise<Post> {
+    const [post] = await db
+      .update(posts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(posts.id, id))
+      .returning();
+    return post;
+  }
+
+  async deletePost(id: string): Promise<void> {
+    await db.delete(posts).where(eq(posts.id, id));
   }
 
   // Question operations

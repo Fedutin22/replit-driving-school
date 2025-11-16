@@ -85,6 +85,7 @@ export const topics = pgTable("topics", {
   courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  type: varchar("type", { length: 20 }).notNull().default("theory"),
   orderIndex: integer("order_index").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
