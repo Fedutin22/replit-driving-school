@@ -144,6 +144,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Check for email conflict with a different user ID
+    if (userData.email) {
+      const existingByEmail = await this.getUserByEmail(userData.email);
+      if (existingByEmail && existingByEmail.id !== userData.id) {
+        throw new Error(`Email ${userData.email} is already registered to a different user`);
+      }
+    }
+
+    // Normal upsert by ID
     const [user] = await db
       .insert(users)
       .values(userData)

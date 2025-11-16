@@ -478,6 +478,9 @@ export const insertScheduleSchema = createInsertSchema(schedules).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  startTime: z.union([z.date(), z.string().transform((val) => new Date(val))]),
+  endTime: z.union([z.date(), z.string().transform((val) => new Date(val))]),
 });
 
 export const insertPaymentSchema = createInsertSchema(payments).omit({
