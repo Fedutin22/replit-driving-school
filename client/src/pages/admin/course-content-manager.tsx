@@ -40,6 +40,7 @@ const assessmentSchema = z.object({
   mode: z.enum(["random", "manual"]).default("random"),
   questionCount: z.coerce.number().min(1).default(10),
   randomizeQuestions: z.boolean().default(false),
+  status: z.enum(["draft", "published"]).default("draft"),
   orderIndex: z.coerce.number().default(0),
   questionIds: z.array(z.string()).optional(), // For manual mode
 });
@@ -162,6 +163,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
       mode: "random",
       questionCount: 10,
       randomizeQuestions: false,
+      status: "draft",
       orderIndex: 0,
     },
   });
@@ -1034,35 +1036,57 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                   )}
                 />
               </div>
-              <FormField
-                control={assessmentForm.control}
-                name="mode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mode</FormLabel>
-                    <FormControl>
-                      <select
-                        className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                        data-testid="select-assessment-mode"
-                        {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          // Clear searched questions when switching modes
-                          if (e.target.value !== "manual") {
-                            setSearchedQuestions([]);
-                            setQuestionSearchTerm("");
-                            setQuestionTagFilter("all");
-                          }
-                        }}
-                      >
-                        <option value="random">Random (from question bank)</option>
-                        <option value="manual">Manual (select specific questions)</option>
-                      </select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={assessmentForm.control}
+                  name="mode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mode</FormLabel>
+                      <FormControl>
+                        <select
+                          className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                          data-testid="select-assessment-mode"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            // Clear searched questions when switching modes
+                            if (e.target.value !== "manual") {
+                              setSearchedQuestions([]);
+                              setQuestionSearchTerm("");
+                              setQuestionTagFilter("all");
+                            }
+                          }}
+                        >
+                          <option value="random">Random (from question bank)</option>
+                          <option value="manual">Manual (select specific questions)</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={assessmentForm.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <FormControl>
+                        <select
+                          className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                          data-testid="select-assessment-status"
+                          {...field}
+                        >
+                          <option value="draft">Draft (not visible to students)</option>
+                          <option value="published">Published (visible to students)</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               </form>
             </Form>
 

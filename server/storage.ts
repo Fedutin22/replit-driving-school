@@ -99,7 +99,7 @@ export interface IStorage {
   reorderTestQuestions(testTemplateId: string, questionOrders: Array<{questionId: string, orderIndex: number}>): Promise<void>;
   
   // Topic assessment operations
-  getTopicAssessments(topicId: string): Promise<TopicAssessment[]>;
+  getTopicAssessments(topicId: string, publishedOnly?: boolean): Promise<TopicAssessment[]>;
   getTopicAssessment(id: string): Promise<TopicAssessment | undefined>;
   createTopicAssessment(assessment: InsertTopicAssessment): Promise<TopicAssessment>;
   updateTopicAssessment(id: string, data: Partial<TopicAssessment>): Promise<TopicAssessment>;
@@ -252,7 +252,7 @@ export class DatabaseStorage implements IStorage {
     return course;
   }
 
-  async getCourseWithContent(id: string): Promise<{ course: Course; topics: Array<Topic & { posts: Post[]; assessments: TopicAssessment[] }>; tests: TestTemplate[] } | undefined> {
+  async getCourseWithContent(id: string, publishedOnly: boolean = false): Promise<{ course: Course; topics: Array<Topic & { posts: Post[]; assessments: TopicAssessment[] }>; tests: TestTemplate[] } | undefined> {
     const course = await this.getCourse(id);
     if (!course) return undefined;
 
@@ -261,7 +261,21 @@ export class DatabaseStorage implements IStorage {
     const topicsWithContent = await Promise.all(
       topicsData.map(async (topic) => {
         const posts = await this.getPostsByTopic(topic.id);
-        const assessments = await this.getTopicAssessments(topic.id);
+        let assessments = await this.getTopicAssessments(topic.id, publishedOnly);
+        
+        // If filtering for published only, also filter out assessments with no questions
+        if (publishedOnly) {
+          const assessmentsWithQuestions = await Promise.all(
+            assessments.map(async (assessment) => {
+              const questions = await this.getAssessmentQuestions(assessment.id);
+              return { assessment, hasQuestions: questions.length > 0 };
+            })
+          );
+          assessments = assessmentsWithQuestions
+            .filter(({ hasQuestions }) => hasQuestions)
+            .map(({ assessment }) => assessment);
+        }
+        
         return { ...topic, posts, assessments };
       })
     );
@@ -603,11 +617,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Topic assessment operations
-  async getTopicAssessments(topicId: string): Promise<TopicAssessment[]> {
+  async getTopicAssessments(topicId: string, publishedOnly: boolean = false): Promise<TopicAssessment[]> {
+    const conditions = [eq(topicAssessments.topicId, topicId)];
+    
+    if (publishedOnly) {
+      conditions.push(eq(topicAssessments.status, 'published'));
+    }
+    
     return await db
       .select()
       .from(topicAssessments)
-      .where(eq(topicAssessments.topicId, topicId))
+      .where(and(...conditions))
       .orderBy(topicAssessments.orderIndex);
   }
 

@@ -185,7 +185,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You must be enrolled in this course to view its content" });
       }
 
-      const courseData = await storage.getCourseWithContent(courseId);
+      // Only show published assessments with questions to students
+      const courseData = await storage.getCourseWithContent(courseId, true);
       if (!courseData) {
         return res.status(404).json({ message: "Course not found" });
       }

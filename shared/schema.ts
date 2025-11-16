@@ -30,6 +30,7 @@ export const sessions = pgTable(
 export const roleEnum = pgEnum("role", ["student", "instructor", "admin"]);
 export const questionTypeEnum = pgEnum("question_type", ["single_choice", "multiple_choice"]);
 export const testModeEnum = pgEnum("test_mode", ["random", "manual"]);
+export const assessmentStatusEnum = pgEnum("assessment_status", ["draft", "published"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "paid", "failed"]);
 export const attendanceStatusEnum = pgEnum("attendance_status", ["present", "absent"]);
 
@@ -147,6 +148,7 @@ export const topicAssessments = pgTable("topic_assessments", {
   randomizeQuestions: boolean("randomize_questions").notNull().default(false),
   passingPercentage: integer("passing_percentage").notNull().default(70),
   isRequired: boolean("is_required").notNull().default(false), // Required for course completion
+  status: assessmentStatusEnum("status").notNull().default("draft"), // Draft or published
   orderIndex: integer("order_index").notNull().default(0), // Position within topic content
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
