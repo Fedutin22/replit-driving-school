@@ -189,6 +189,23 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(courses).orderBy(desc(courses.createdAt));
   }
 
+  async getCoursesWithScheduleCount(): Promise<Array<Course & { scheduleCount: number }>> {
+    const result = await db
+      .select({
+        course: courses,
+        scheduleCount: sql<number>`CAST(COUNT(${schedules.id}) AS INTEGER)`,
+      })
+      .from(courses)
+      .leftJoin(schedules, eq(courses.id, schedules.courseId))
+      .groupBy(courses.id)
+      .orderBy(desc(courses.createdAt));
+    
+    return result.map(row => ({
+      ...row.course,
+      scheduleCount: row.scheduleCount,
+    }));
+  }
+
   async getCourse(id: string): Promise<Course | undefined> {
     const [course] = await db.select().from(courses).where(eq(courses.id, id));
     return course || undefined;

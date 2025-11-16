@@ -783,7 +783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/courses', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
     try {
-      const courses = await storage.getCourses();
+      const courses = await storage.getCoursesWithScheduleCount();
       res.json(courses);
     } catch (error) {
       console.error("Error fetching courses:", error);

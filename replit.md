@@ -86,9 +86,14 @@ Preferred communication style: Simple, everyday language.
 **Schedule Management:**
 - Admin/instructor schedule CRUD integrated into courses page
 - Dialog-based UI pattern following course content manager design
-- Storage methods: `getSchedulesByCourse`, `getSchedule`, `createSchedule`, `updateSchedule`, `deleteSchedule`, `getSchedulesWithDetails`
+- Storage methods: `getSchedulesByCourse`, `getSchedule`, `createSchedule`, `updateSchedule`, `deleteSchedule`, `getSchedulesWithDetails`, `getCoursesWithScheduleCount`
 - API endpoints: GET/POST `/api/admin/courses/:courseId/schedules`, PATCH/DELETE `/api/admin/schedules/:id`, GET `/api/schedules`
 - Date handling: Frontend uses datetime-local inputs (ISO strings), backend schema coerces to Date objects
+- **Course Management Schedule Count:**
+  - Course management table (`/admin/courses`) displays schedule count for each course
+  - Optimized query using LEFT JOIN and COUNT aggregation (no N+1 queries)
+  - Properly typed with `CourseWithScheduleCount` type for type safety
+  - Shows number of scheduled sessions per course at a glance
 - **Schedule Calendar Feature:**
   - Weekly calendar view accessible via `/schedule` (students), `/instructor/schedule` (instructors), `/admin/schedule` (admins)
   - Role-based filtering: Students see only schedules for enrolled courses; instructors/admins see all schedules
