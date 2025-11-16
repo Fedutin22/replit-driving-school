@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash, FileText, List } from "lucide-react";
+import { Plus, Edit, Trash, FileText, List, ArrowUp, ArrowDown } from "lucide-react";
 import type { Course, Topic, Post } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -137,6 +137,22 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
     },
   });
 
+  const reorderTopicMutation = useMutation({
+    mutationFn: async ({ id, direction }: { id: string; direction: 'up' | 'down' }) => {
+      await apiRequest("POST", `/api/admin/topics/${id}/reorder`, { direction });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/topics", course.id] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const createOrUpdatePostMutation = useMutation({
     mutationFn: async (data: PostForm) => {
       if (!selectedTopic) throw new Error("No topic selected");
@@ -176,6 +192,22 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
         title: "Post Deleted",
         description: "Post has been deleted successfully",
       });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const reorderPostMutation = useMutation({
+    mutationFn: async ({ id, direction }: { id: string; direction: 'up' | 'down' }) => {
+      await apiRequest("POST", `/api/admin/posts/${id}/reorder`, { direction });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/posts", selectedTopic?.id] });
     },
     onError: (error: Error) => {
       toast({
@@ -268,7 +300,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                     No topics yet. Create your first topic to organize course content.
                   </p>
                 ) : (
-                  topics.map((topic) => (
+                  topics.map((topic, index) => (
                     <Card key={topic.id} className={selectedTopic?.id === topic.id ? "border-primary" : ""}>
                       <CardHeader className="p-4">
                         <div className="flex items-center justify-between">
@@ -284,6 +316,24 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                             </p>
                           </div>
                           <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => reorderTopicMutation.mutate({ id: topic.id, direction: 'up' })}
+                              disabled={index === 0}
+                              data-testid={`button-move-up-topic-${topic.id}`}
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => reorderTopicMutation.mutate({ id: topic.id, direction: 'down' })}
+                              disabled={index === topics.length - 1}
+                              data-testid={`button-move-down-topic-${topic.id}`}
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -361,7 +411,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                         No posts yet. Create your first post to add content to this topic.
                       </p>
                     ) : (
-                      posts.map((post) => (
+                      posts.map((post, index) => (
                         <Card key={post.id}>
                           <CardHeader className="p-4">
                             <div className="flex items-center justify-between">
@@ -375,6 +425,24 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                                 />
                               </div>
                               <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => reorderPostMutation.mutate({ id: post.id, direction: 'up' })}
+                                  disabled={index === 0}
+                                  data-testid={`button-move-up-post-${post.id}`}
+                                >
+                                  <ArrowUp className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => reorderPostMutation.mutate({ id: post.id, direction: 'down' })}
+                                  disabled={index === posts.length - 1}
+                                  data-testid={`button-move-down-post-${post.id}`}
+                                >
+                                  <ArrowDown className="h-4 w-4" />
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
