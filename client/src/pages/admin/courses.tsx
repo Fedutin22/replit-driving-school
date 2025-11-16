@@ -18,6 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { CourseContentManager } from "./course-content-manager";
+import { ScheduleManager } from "./schedule-manager";
 
 const courseSchema = z.object({
   name: z.string().min(1, "Course name is required"),
@@ -298,6 +299,14 @@ export default function AdminCourses() {
           course={managingCourse}
           open={!!managingCourse}
           onClose={() => setManagingCourse(null)}
+        />
+      )}
+
+      {managingSchedules && (
+        <ScheduleManager
+          course={managingSchedules}
+          open={!!managingSchedules}
+          onClose={() => setManagingSchedules(null)}
         />
       )}
     </div>
