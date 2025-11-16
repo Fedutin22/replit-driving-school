@@ -202,21 +202,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTopic(topicData: InsertTopic): Promise<Topic> {
-    // Calculate the next orderIndex server-side to ensure uniqueness
-    const existingTopics = await db
-      .select()
-      .from(topics)
-      .where(eq(topics.courseId, topicData.courseId));
-    
-    const maxOrderIndex = existingTopics.length > 0
-      ? Math.max(...existingTopics.map(t => t.orderIndex))
-      : -1;
-    
-    const [topic] = await db.insert(topics).values({
-      ...topicData,
-      orderIndex: maxOrderIndex + 1,
-    }).returning();
-    return topic;
+    // Calculate the next orderIndex server-side in a transaction with advisory lock
+    return await db.transaction(async (tx) => {
+      // Use hashCode to create a stable numeric lock ID from courseId
+      const hashCode = (str: string): number => {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          const char = str.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash; // Convert to 32bit integer
+        }
+        return Math.abs(hash);
+      };
+      
+      const lockId = hashCode(`topic_create_${topicData.courseId}`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockId})`);
+      
+      const existingTopics = await tx
+        .select()
+        .from(topics)
+        .where(eq(topics.courseId, topicData.courseId))
+        .orderBy(desc(topics.orderIndex))
+        .limit(1);
+      
+      const maxOrderIndex = existingTopics.length > 0
+        ? existingTopics[0].orderIndex
+        : -1;
+      
+      const [topic] = await tx.insert(topics).values({
+        ...topicData,
+        orderIndex: maxOrderIndex + 1,
+      }).returning();
+      return topic;
+    });
   }
 
   async updateTopic(id: string, data: Partial<Topic>): Promise<Topic> {
@@ -272,21 +290,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPost(postData: InsertPost): Promise<Post> {
-    // Calculate the next orderIndex server-side to ensure uniqueness
-    const existingPosts = await db
-      .select()
-      .from(posts)
-      .where(eq(posts.topicId, postData.topicId));
-    
-    const maxOrderIndex = existingPosts.length > 0
-      ? Math.max(...existingPosts.map(p => p.orderIndex))
-      : -1;
-    
-    const [post] = await db.insert(posts).values({
-      ...postData,
-      orderIndex: maxOrderIndex + 1,
-    }).returning();
-    return post;
+    // Calculate the next orderIndex server-side in a transaction with advisory lock
+    return await db.transaction(async (tx) => {
+      // Use hashCode to create a stable numeric lock ID from topicId
+      const hashCode = (str: string): number => {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          const char = str.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash; // Convert to 32bit integer
+        }
+        return Math.abs(hash);
+      };
+      
+      const lockId = hashCode(`post_create_${postData.topicId}`);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockId})`);
+      
+      const existingPosts = await tx
+        .select()
+        .from(posts)
+        .where(eq(posts.topicId, postData.topicId))
+        .orderBy(desc(posts.orderIndex))
+        .limit(1);
+      
+      const maxOrderIndex = existingPosts.length > 0
+        ? existingPosts[0].orderIndex
+        : -1;
+      
+      const [post] = await tx.insert(posts).values({
+        ...postData,
+        orderIndex: maxOrderIndex + 1,
+      }).returning();
+      return post;
+    });
   }
 
   async updatePost(id: string, data: Partial<Post>): Promise<Post> {
