@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { RichTextEditor } from "@/components/rich-text-editor";
 
 const topicSchema = z.object({
   name: z.string().min(1, "Topic name is required"),
@@ -491,13 +492,12 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                 name="content"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Content (HTML supported)</FormLabel>
+                    <FormLabel>Content</FormLabel>
                     <FormControl>
-                      <Textarea
-                        data-testid="input-post-content"
-                        placeholder="Enter post content (HTML tags supported)..."
-                        rows={12}
-                        {...field}
+                      <RichTextEditor
+                        content={field.value}
+                        onChange={field.onChange}
+                        placeholder="Write your post content here..."
                       />
                     </FormControl>
                     <FormMessage />
