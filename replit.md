@@ -156,3 +156,35 @@ Preferred communication style: Simple, everyday language.
 - Custom CSS variables for theming (light/dark mode support)
 - Consistent spacing scale (2, 3, 4, 6, 8, 12, 16px units)
 - Border radius: lg (9px), md (6px), sm (3px)
+
+## Development Data
+
+**Seed Script** (`server/seed.ts`):
+- Run with: `npx tsx server/seed.ts`
+- Populates database with comprehensive mock data for development and testing
+
+**Seeded Data Includes:**
+- **Instructors** (2): John Doe, Jane Smith (password: `password123`)
+- **Courses** (3):
+  - Beginner Driver Training ($1200, Beginner category)
+  - Advanced Defensive Driving ($800, Advanced category)
+  - Commercial License Preparation ($2500, Professional category)
+- **Topics** (7): Mix of theory and practice topics across all courses
+- **Posts** (5): Learning content with HTML formatting
+- **Questions** (6): Single-choice questions with tags (traffic-signs, vehicle-control, defensive-driving, parking)
+- **Test Templates** (2): Linked to Beginner and Advanced courses via courseCompletionTests
+- **Schedules** (5): Upcoming sessions 1-3 weeks out with proper instructor assignments
+- **Students** (6) - All at different progress stages:
+  - Alice Johnson: Just started beginner course (10 days ago)
+  - Bob Williams: Mid-way through beginner (30 days ago)
+  - Carol Davis: Almost completed beginner (60 days ago)
+  - David Miller: Completed beginner course (90 days enrolled, completed 5 days ago)
+  - Emma Wilson: In advanced course (15 days ago)
+  - Frank Moore: In commercial course (20 days ago)
+- **Enrollments** (6): Matching student progress stages
+- **Test Instances** (3): Carol (85%, passed), David (95%, passed), Bob (65%, failed)
+- **Session Registrations** (4): Students registered for upcoming sessions
+
+**Default Credentials:**
+- All seeded users (instructors and students) use password: `password123`
+- Emails follow pattern: firstname.lastname@domain.com
