@@ -73,8 +73,6 @@ export const courses = pgTable("courses", {
 export const coursesRelations = relations(courses, ({ many }) => ({
   topics: many(topics),
   enrollments: many(courseEnrollments),
-  questions: many(questions),
-  testTemplates: many(testTemplates),
   completionTests: many(courseCompletionTests),
   schedules: many(schedules),
   payments: many(payments),
@@ -97,41 +95,29 @@ export const topicsRelations = relations(topics, ({ one, many }) => ({
     fields: [topics.courseId],
     references: [courses.id],
   }),
-  questions: many(questions),
   schedules: many(schedules),
 }));
 
-// Questions table
+// Questions table - Standalone question bank (not linked to courses or topics)
 export const questions = pgTable("questions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  courseId: varchar("course_id").references(() => courses.id, { onDelete: "cascade" }),
-  topicId: varchar("topic_id").references(() => topics.id, { onDelete: "set null" }),
   questionText: text("question_text").notNull(),
   explanation: text("explanation"),
   type: questionTypeEnum("type").notNull(),
   choices: jsonb("choices").notNull(), // Array of {label: string, isCorrect: boolean}
-  tags: jsonb("tags"), // Array of strings
+  tags: jsonb("tags"), // Array of strings for categorization
   isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const questionsRelations = relations(questions, ({ one, many }) => ({
-  course: one(courses, {
-    fields: [questions.courseId],
-    references: [courses.id],
-  }),
-  topic: one(topics, {
-    fields: [questions.topicId],
-    references: [topics.id],
-  }),
+export const questionsRelations = relations(questions, ({ many }) => ({
   testQuestions: many(testQuestions),
 }));
 
-// Test templates table
+// Test templates table - Reusable across multiple courses
 export const testTemplates = pgTable("test_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  courseId: varchar("course_id").references(() => courses.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   mode: testModeEnum("mode").notNull(),
@@ -141,11 +127,7 @@ export const testTemplates = pgTable("test_templates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const testTemplatesRelations = relations(testTemplates, ({ one, many }) => ({
-  course: one(courses, {
-    fields: [testTemplates.courseId],
-    references: [courses.id],
-  }),
+export const testTemplatesRelations = relations(testTemplates, ({ many }) => ({
   testQuestions: many(testQuestions),
   testInstances: many(testInstances),
   completionTests: many(courseCompletionTests),

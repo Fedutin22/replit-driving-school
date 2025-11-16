@@ -19,6 +19,9 @@ import Certificates from "@/pages/certificates";
 import Questions from "@/pages/questions";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
+import AdminCourses from "@/pages/admin/courses";
+import AdminTestTemplates from "@/pages/admin/test-templates";
+import AdminQuestions from "@/pages/admin/questions";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
@@ -55,6 +58,9 @@ function Router() {
           <Route path="/questions" component={Questions} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={AdminUsers} />
+          <Route path="/admin/courses" component={AdminCourses} />
+          <Route path="/admin/test-templates" component={AdminTestTemplates} />
+          <Route path="/admin/questions" component={AdminQuestions} />
         </>
       )}
       <Route component={NotFound} />

@@ -63,7 +63,6 @@ export interface IStorage {
   // Question operations
   getQuestions(): Promise<Question[]>;
   getQuestion(id: string): Promise<Question | undefined>;
-  getQuestionsByCourse(courseId: string): Promise<Question[]>;
   createQuestion(question: InsertQuestion): Promise<Question>;
   updateQuestion(id: string, data: Partial<Question>): Promise<Question>;
   deleteQuestion(id: string): Promise<void>;
@@ -71,6 +70,7 @@ export interface IStorage {
   // Test template operations
   getTestTemplates(): Promise<TestTemplate[]>;
   getTestTemplate(id: string): Promise<TestTemplate | undefined>;
+  getTestTemplatesByCourse(courseId: string): Promise<TestTemplate[]>;
   createTestTemplate(template: InsertTestTemplate): Promise<TestTemplate>;
   updateTestTemplate(id: string, data: Partial<TestTemplate>): Promise<TestTemplate>;
   getTestQuestions(testTemplateId: string): Promise<any[]>;
@@ -228,14 +228,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(questions).where(eq(questions.id, id));
   }
 
-  async getQuestionsByCourse(courseId: string): Promise<Question[]> {
-    return await db
-      .select()
-      .from(questions)
-      .where(eq(questions.courseId, courseId))
-      .orderBy(desc(questions.createdAt));
-  }
-
   // Test template operations
   async getTestTemplates(): Promise<TestTemplate[]> {
     return await db.select().from(testTemplates).orderBy(desc(testTemplates.createdAt));
@@ -244,6 +236,24 @@ export class DatabaseStorage implements IStorage {
   async getTestTemplate(id: string): Promise<TestTemplate | undefined> {
     const [template] = await db.select().from(testTemplates).where(eq(testTemplates.id, id));
     return template || undefined;
+  }
+
+  async getTestTemplatesByCourse(courseId: string): Promise<TestTemplate[]> {
+    // Get test templates linked to this course via courseCompletionTests
+    const completionTests = await db
+      .select()
+      .from(courseCompletionTests)
+      .where(eq(courseCompletionTests.courseId, courseId));
+    
+    if (completionTests.length === 0) {
+      return [];
+    }
+    
+    const templateIds = completionTests.map(ct => ct.testTemplateId);
+    return await db
+      .select()
+      .from(testTemplates)
+      .where(inArray(testTemplates.id, templateIds));
   }
 
   async createTestTemplate(templateData: InsertTestTemplate): Promise<TestTemplate> {

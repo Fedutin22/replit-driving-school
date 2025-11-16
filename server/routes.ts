@@ -209,11 +209,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let questions;
       if (template.mode === 'random') {
-        const allQuestions = await storage.getQuestionsByCourse(template.courseId || '');
-        questions = allQuestions
+        // For random mode, pull from all active questions in the question bank
+        const allQuestions = await storage.getQuestions();
+        const activeQuestions = allQuestions.filter(q => !q.isArchived);
+        questions = activeQuestions
           .sort(() => Math.random() - 0.5)
           .slice(0, template.questionCount || 10);
       } else {
+        // For manual mode, use the specific questions linked to this template
         const testQuestions = await storage.getTestQuestions(templateId);
         questions = testQuestions.map(tq => tq.question);
       }
@@ -459,10 +462,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .text('This is to certify that', 0, 200, { align: 'center' });
 
       // Student name
+      const studentName = student ? `${student.firstName || ''} ${student.lastName || ''}`.trim() : 'Student';
       doc.fontSize(32)
         .font('Helvetica-Bold')
         .fillColor('#0f172a')
-        .text(student?.fullName || 'Student', 0, 240, { align: 'center' });
+        .text(studentName, 0, 240, { align: 'center' });
 
       // Course completion text
       doc.fontSize(16)
@@ -634,9 +638,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Test pass rates by course
       const testPassRatesData = await Promise.all(
         courses.slice(0, 5).map(async (course) => {
-          // Get templates for this course
-          const templates = await storage.getTestTemplates();
-          const courseTemplates = templates.filter(t => t.courseId === course.id);
+          // Get templates linked to this course via courseCompletionTests
+          const courseTemplates = await storage.getTestTemplatesByCourse(course.id);
           const templateIds = courseTemplates.map(t => t.id);
           
           // Filter test instances for this course's templates
@@ -691,12 +694,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const students = users.filter(u => u.role === 'student');
       
       const csv = [
-        ['ID', 'Name', 'Email', 'Phone', 'Active', 'Created At'].map(csvEscape).join(','),
+        ['ID', 'First Name', 'Last Name', 'Email', 'Role', 'Active', 'Created At'].map(csvEscape).join(','),
         ...students.map(s => [
           csvEscape(s.id),
-          csvEscape(s.fullName || ''),
+          csvEscape(s.firstName || ''),
+          csvEscape(s.lastName || ''),
           csvEscape(s.email || ''),
-          csvEscape(s.phoneNumber || ''),
+          csvEscape(s.role),
           csvEscape(s.isActive ? 'Yes' : 'No'),
           csvEscape(new Date(s.createdAt).toLocaleDateString())
         ].join(','))
