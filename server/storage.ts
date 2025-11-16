@@ -55,6 +55,7 @@ export interface IStorage {
   // Course operations
   getCourses(): Promise<Course[]>;
   getCourse(id: string): Promise<Course | undefined>;
+  getCourseWithContent(id: string): Promise<{ course: Course; topics: Array<Topic & { posts: Post[] }>; tests: TestTemplate[] } | undefined>;
   createCourse(course: InsertCourse): Promise<Course>;
   updateCourse(id: string, data: Partial<Course>): Promise<Course>;
   
@@ -96,6 +97,8 @@ export interface IStorage {
   getTestInstance(id: string): Promise<TestInstance | undefined>;
   updateTestInstance(id: string, data: Partial<TestInstance>): Promise<TestInstance>;
   getTestInstancesByStudent(studentId: string): Promise<TestInstance[]>;
+  startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>;
+  submitTest(testInstanceId: string, answers: Record<string, any>): Promise<TestInstance>;
   
   // Enrollment operations
   createEnrollment(enrollment: InsertCourseEnrollment): Promise<CourseEnrollment>;
@@ -223,6 +226,25 @@ export class DatabaseStorage implements IStorage {
       .where(eq(courses.id, id))
       .returning();
     return course;
+  }
+
+  async getCourseWithContent(id: string): Promise<{ course: Course; topics: Array<Topic & { posts: Post[] }>; tests: TestTemplate[] } | undefined> {
+    const course = await this.getCourse(id);
+    if (!course) return undefined;
+
+    // Get topics with posts
+    const topicsData = await this.getTopicsByCourse(id);
+    const topicsWithPosts = await Promise.all(
+      topicsData.map(async (topic) => {
+        const posts = await this.getPostsByTopic(topic.id);
+        return { ...topic, posts };
+      })
+    );
+
+    // Get test templates for this course
+    const tests = await this.getTestTemplatesByCourse(id);
+
+    return { course, topics: topicsWithPosts, tests };
   }
 
   // Topic operations
@@ -567,6 +589,112 @@ export class DatabaseStorage implements IStorage {
       .from(testInstances)
       .where(eq(testInstances.studentId, studentId))
       .orderBy(desc(testInstances.createdAt));
+  }
+
+  async startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }> {
+    const template = await this.getTestTemplate(testTemplateId);
+    if (!template) {
+      throw new Error('Test template not found');
+    }
+
+    let questionsToServe: any[] = [];
+
+    if (template.mode === 'manual') {
+      // Get manually selected questions
+      const testQuestionsData = await this.getTestQuestions(testTemplateId);
+      questionsToServe = testQuestionsData.map(tq => ({
+        id: tq.question.id,
+        questionText: tq.question.questionText,
+        type: tq.question.type,
+        choices: tq.question.choices,
+        orderIndex: tq.orderIndex,
+      }));
+    } else if (template.mode === 'random') {
+      // Get random questions from question bank
+      const allQuestions = await this.getQuestions();
+      const activeQuestions = allQuestions.filter(q => !q.isArchived);
+      
+      // Shuffle and take questionCount questions
+      const shuffled = activeQuestions.sort(() => Math.random() - 0.5);
+      const count = Math.min(template.questionCount || 10, shuffled.length);
+      questionsToServe = shuffled.slice(0, count).map((q, index) => ({
+        id: q.id,
+        questionText: q.questionText,
+        type: q.type,
+        choices: q.choices,
+        orderIndex: index,
+      }));
+    }
+
+    // Randomize question order if template specifies
+    if (template.randomizeQuestions) {
+      questionsToServe.sort(() => Math.random() - 0.5);
+      questionsToServe.forEach((q, index) => {
+        q.orderIndex = index;
+      });
+    }
+
+    // Create test instance with questions snapshot
+    const testInstance = await this.createTestInstance({
+      testTemplateId,
+      studentId,
+      questionsData: questionsToServe,
+      answersData: null,
+      score: null,
+      percentage: null,
+      passed: null,
+      submittedAt: null,
+    });
+
+    return { testInstance, questions: questionsToServe };
+  }
+
+  async submitTest(testInstanceId: string, answers: Record<string, any>): Promise<TestInstance> {
+    const instance = await this.getTestInstance(testInstanceId);
+    if (!instance) {
+      throw new Error('Test instance not found');
+    }
+
+    const template = await this.getTestTemplate(instance.testTemplateId);
+    if (!template) {
+      throw new Error('Test template not found');
+    }
+
+    const questions = instance.questionsData as any[];
+    let correctCount = 0;
+    let totalQuestions = questions.length;
+
+    // Calculate score
+    for (const question of questions) {
+      const studentAnswer = answers[question.id];
+      const choices = question.choices as any[];
+      const correctChoices = choices.filter((c: any) => c.isCorrect).map((c: any) => c.label);
+
+      if (question.type === 'single_choice') {
+        if (studentAnswer && correctChoices.includes(studentAnswer)) {
+          correctCount++;
+        }
+      } else if (question.type === 'multiple_choice') {
+        const studentChoices = studentAnswer || [];
+        const isCorrect = correctChoices.length === studentChoices.length &&
+          correctChoices.every((c: string) => studentChoices.includes(c));
+        if (isCorrect) {
+          correctCount++;
+        }
+      }
+    }
+
+    const percentage = Math.round((correctCount / totalQuestions) * 100);
+    const passed = percentage >= template.passingPercentage;
+
+    // Update test instance
+    return await this.updateTestInstance(testInstanceId, {
+      answersData: answers,
+      score: correctCount,
+      percentage,
+      passed,
+      submittedAt: new Date(),
+    });
   }
 
   // Enrollment operations
