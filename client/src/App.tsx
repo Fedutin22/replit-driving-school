@@ -63,6 +63,8 @@ function Router() {
           <Route path="/admin/courses" component={AdminCourses} />
           <Route path="/admin/test-templates" component={AdminTestTemplates} />
           <Route path="/admin/questions" component={AdminQuestions} />
+          <Route path="/admin/schedule" component={SchedulePage} />
+          <Route path="/instructor/schedule" component={SchedulePage} />
         </>
       )}
       <Route component={NotFound} />

@@ -1,29 +1,31 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar as CalendarIcon, Clock, MapPin, Users, CheckCircle2 } from "lucide-react";
-import type { Schedule } from "@shared/schema";
-import { format } from "date-fns";
+import { Calendar as CalendarIcon, Clock, MapPin, Users, BookOpen, User as UserIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import type { Schedule, Course, Topic, User } from "@shared/schema";
+import { format, startOfWeek, addDays, isSameDay, parseISO } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface ScheduleWithDetails extends Schedule {
-  courseName?: string;
-  topicName?: string;
-  instructorName?: string;
-  registeredCount?: number;
+  course: Course;
+  topic: Topic | null;
+  instructor: User;
+  registeredStudentsCount: number;
   isRegistered?: boolean;
-  canRegister?: boolean;
 }
 
 export default function SchedulePage() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => 
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
 
   const { data: schedules, isLoading } = useQuery<ScheduleWithDetails[]>({
     queryKey: ["/api/schedules"],
@@ -104,196 +106,205 @@ export default function SchedulePage() {
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <div>
-          <Skeleton className="h-8 w-48 mb-2" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-full" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
+
+  const getSchedulesForDay = (date: Date) => {
+    if (!schedules) return [];
+    return schedules.filter((schedule) =>
+      isSameDay(parseISO(schedule.startTime.toString()), date)
+    ).sort((a, b) => 
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     );
-  }
+  };
 
-  const upcomingSessions = schedules?.filter(
-    (s) => new Date(s.startTime) > new Date()
-  ) || [];
-  const pastSessions = schedules?.filter(
-    (s) => new Date(s.startTime) <= new Date()
-  ) || [];
+  const previousWeek = () => {
+    setCurrentWeekStart(addDays(currentWeekStart, -7));
+  };
 
-  const registeredSessions = upcomingSessions.filter((s) => s.isRegistered);
-  const availableSessions = upcomingSessions.filter((s) => !s.isRegistered);
+  const nextWeek = () => {
+    setCurrentWeekStart(addDays(currentWeekStart, 7));
+  };
+
+  const goToToday = () => {
+    setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  };
+
+  const isStudent = user?.role === 'student';
 
   return (
-    <div className="p-6 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-schedule">
-          Schedule
-        </h1>
-        <p className="text-muted-foreground">
-          View and register for upcoming sessions
-        </p>
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="heading-schedule">
+            <CalendarIcon className="h-8 w-8" />
+            Schedule Calendar
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {isStudent ? "View your enrolled course sessions" : "View all scheduled sessions"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={previousWeek} data-testid="button-previous-week">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" onClick={goToToday} data-testid="button-today">
+            Today
+          </Button>
+          <Button variant="outline" onClick={nextWeek} data-testid="button-next-week">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {registeredSessions.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4">My Registered Sessions</h2>
-          <div className="space-y-4">
-            {registeredSessions.map((session) => (
-              <Card key={session.id} className="hover-elevate border-primary/50" data-testid={`card-registered-session-${session.id}`}>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base mb-1">{session.title}</CardTitle>
-                      <CardDescription>
-                        {session.courseName}
-                        {session.topicName && ` • ${session.topicName}`}
-                      </CardDescription>
-                    </div>
-                    <Badge variant="default" className="flex-shrink-0">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Registered
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-2 text-sm">
-                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                      <span>{format(new Date(session.startTime), "MMM d, yyyy")}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>
-                        {format(new Date(session.startTime), "h:mm a")} -{" "}
-                        {format(new Date(session.endTime), "h:mm a")}
-                      </span>
-                    </div>
-                  </div>
-                  {session.location && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">{session.location}</span>
-                    </div>
-                  )}
-                  {session.instructorName && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Instructor: {session.instructorName}</span>
-                    </div>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => unregisterMutation.mutate(session.id)}
-                    disabled={unregisterMutation.isPending}
-                    data-testid={`button-unregister-${session.id}`}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">
+            Week of {format(currentWeekStart, "MMMM d, yyyy")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+              {weekDays.map((day, index) => {
+                const daySchedules = getSchedulesForDay(day);
+                const isToday = isSameDay(day, new Date());
+
+                return (
+                  <div
+                    key={index}
+                    className={`border rounded-md p-3 ${
+                      isToday ? "border-primary bg-primary/5" : ""
+                    }`}
+                    data-testid={`day-column-${index}`}
                   >
-                    {unregisterMutation.isPending ? "Canceling..." : "Cancel Registration"}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {availableSessions.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Available Sessions</h2>
-          <div className="space-y-4">
-            {availableSessions.map((session) => {
-              const seatsLeft = session.capacity - (session.registeredCount || 0);
-              const isFull = seatsLeft <= 0;
-
-              return (
-                <Card key={session.id} className="hover-elevate" data-testid={`card-available-session-${session.id}`}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base mb-1">{session.title}</CardTitle>
-                        <CardDescription>
-                          {session.courseName}
-                          {session.topicName && ` • ${session.topicName}`}
-                        </CardDescription>
+                    <div className="font-semibold mb-2 text-center">
+                      <div className="text-sm text-muted-foreground">
+                        {format(day, "EEE")}
                       </div>
-                      <Badge variant={isFull ? "destructive" : "secondary"} className="flex-shrink-0">
-                        {isFull ? "Full" : `${seatsLeft} seats left`}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center gap-2 text-sm">
-                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                        <span>{format(new Date(session.startTime), "MMM d, yyyy")}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span>
-                          {format(new Date(session.startTime), "h:mm a")} -{" "}
-                          {format(new Date(session.endTime), "h:mm a")}
-                        </span>
+                      <div className={`text-lg ${isToday ? "text-primary" : ""}`}>
+                        {format(day, "d")}
                       </div>
                     </div>
-                    {session.location && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">{session.location}</span>
-                      </div>
-                    )}
-                    {session.instructorName && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Instructor: {session.instructorName}</span>
-                      </div>
-                    )}
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => registerMutation.mutate(session.id)}
-                      disabled={!session.canRegister || isFull || registerMutation.isPending}
-                      data-testid={`button-register-${session.id}`}
-                    >
-                      {registerMutation.isPending
-                        ? "Registering..."
-                        : isFull
-                        ? "Session Full"
-                        : !session.canRegister
-                        ? "Not Eligible"
-                        : "Register"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                    <div className="space-y-2">
+                      {daySchedules.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-4">
+                          No sessions
+                        </p>
+                      ) : (
+                        daySchedules.map((schedule) => {
+                          const availableSeats = schedule.capacity - schedule.registeredStudentsCount;
+                          const isFull = availableSeats <= 0;
 
-      {upcomingSessions.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium text-foreground mb-2">No upcoming sessions</p>
-            <p className="text-sm text-muted-foreground">Check back later for new sessions</p>
-          </CardContent>
-        </Card>
-      )}
+                          return (
+                            <Card
+                              key={schedule.id}
+                              className="p-2 hover-elevate"
+                              data-testid={`schedule-card-${schedule.id}`}
+                            >
+                              <div className="space-y-1.5">
+                                <div className="flex items-start justify-between gap-1">
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-xs font-semibold truncate" title={schedule.title}>
+                                      {schedule.title}
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground truncate" title={schedule.course.name}>
+                                      <BookOpen className="h-3 w-3 inline mr-1" />
+                                      {schedule.course.name}
+                                    </p>
+                                  </div>
+                                  {schedule.isRegistered && (
+                                    <Badge variant="default" className="text-xs shrink-0">
+                                      Registered
+                                    </Badge>
+                                  )}
+                                </div>
+
+                                <div className="space-y-0.5 text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    <span>
+                                      {format(parseISO(schedule.startTime.toString()), "HH:mm")} -{" "}
+                                      {format(parseISO(schedule.endTime.toString()), "HH:mm")}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 truncate" title={schedule.instructor.firstName + " " + schedule.instructor.lastName}>
+                                    <UserIcon className="h-3 w-3" />
+                                    <span className="truncate">
+                                      {schedule.instructor.firstName} {schedule.instructor.lastName}
+                                    </span>
+                                  </div>
+
+                                  {schedule.location && (
+                                    <div className="flex items-center gap-1 truncate" title={schedule.location}>
+                                      <MapPin className="h-3 w-3" />
+                                      <span className="truncate">{schedule.location}</span>
+                                    </div>
+                                  )}
+
+                                  <div className="flex items-center gap-1">
+                                    <Users className="h-3 w-3" />
+                                    <span>
+                                      {schedule.registeredStudentsCount}/{schedule.capacity}
+                                    </span>
+                                    {isFull && (
+                                      <Badge variant="destructive" className="text-xs ml-1">
+                                        Full
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {isStudent && new Date(schedule.startTime) > new Date() && (
+                                  <div className="pt-1">
+                                    {schedule.isRegistered ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full text-xs h-7"
+                                        onClick={() => unregisterMutation.mutate(schedule.id)}
+                                        disabled={unregisterMutation.isPending}
+                                        data-testid={`button-unregister-${schedule.id}`}
+                                      >
+                                        {unregisterMutation.isPending ? "Canceling..." : "Cancel"}
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="default"
+                                        size="sm"
+                                        className="w-full text-xs h-7"
+                                        onClick={() => registerMutation.mutate(schedule.id)}
+                                        disabled={isFull || registerMutation.isPending}
+                                        data-testid={`button-register-${schedule.id}`}
+                                      >
+                                        {registerMutation.isPending
+                                          ? "Registering..."
+                                          : isFull
+                                          ? "Full"
+                                          : "Register"}
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </Card>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
