@@ -27,7 +27,7 @@ interface TestStartResponse {
 }
 
 export default function TakeTest() {
-  const { testId } = useParams();
+  const { testId, assessmentId } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -38,8 +38,13 @@ export default function TakeTest() {
 
   // Start the test on mount
   useEffect(() => {
-    if (testId) {
-      apiRequest("POST", `/api/tests/${testId}/start`)
+    const id = testId || assessmentId;
+    if (id) {
+      const endpoint = testId 
+        ? `/api/tests/${testId}/start`
+        : `/api/assessments/${assessmentId}/start`;
+        
+      apiRequest("POST", endpoint)
         .then((res) => res.json())
         .then((data: TestStartResponse) => {
           setTestData(data);
@@ -50,7 +55,7 @@ export default function TakeTest() {
           setIsStarting(false);
         });
     }
-  }, [testId]);
+  }, [testId, assessmentId]);
 
   // Submit test mutation
   const submitMutation = useMutation({

@@ -72,8 +72,8 @@ async function upsertUser(
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
-    // Preserve existing role if user exists, otherwise default to student
-    role: existingUser?.role || 'student',
+    // Preserve existing role, or use role from claims, or default to student
+    role: existingUser?.role || claims["role"] || 'student',
   });
   
   return userId;
