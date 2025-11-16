@@ -305,22 +305,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/schedules', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const schedules = await storage.getSchedules();
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
-      const schedulesWithDetails = await Promise.all(
-        schedules.map(async (schedule) => {
-          const registeredCount = await storage.getSessionRegistrationCount(schedule.id);
-          const isRegistered = await storage.isStudentRegistered(schedule.id, userId);
-          const enrollment = schedule.courseId ? await storage.getEnrollment(schedule.courseId, userId) : null;
-
-          return {
-            ...schedule,
-            registeredCount,
-            isRegistered,
-            canRegister: !!enrollment && enrollment.isActive,
-          };
-        })
-      );
+      const studentId = user.role === 'student' ? userId : undefined;
+      const schedulesWithDetails = await storage.getSchedulesWithDetails(studentId);
 
       res.json(schedulesWithDetails);
     } catch (error) {

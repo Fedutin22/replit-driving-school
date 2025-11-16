@@ -109,6 +109,7 @@ export interface IStorage {
   getSchedules(): Promise<Schedule[]>;
   getSchedulesByCourse(courseId: string): Promise<Schedule[]>;
   getSchedule(id: string): Promise<Schedule | undefined>;
+  getSchedulesWithDetails(studentId?: string): Promise<Array<Schedule & { course: Course; topic: Topic | null; instructor: User; registeredStudentsCount: number; isRegistered?: boolean }>>;
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
   updateSchedule(id: string, data: Partial<Schedule>): Promise<Schedule>;
   deleteSchedule(id: string): Promise<void>;
@@ -639,6 +640,75 @@ export class DatabaseStorage implements IStorage {
   async getSchedule(id: string): Promise<Schedule | undefined> {
     const [schedule] = await db.select().from(schedules).where(eq(schedules.id, id));
     return schedule || undefined;
+  }
+
+  async getSchedulesWithDetails(studentId?: string): Promise<Array<Schedule & { course: Course; topic: Topic | null; instructor: User; registeredStudentsCount: number; isRegistered?: boolean }>> {
+    let schedulesData;
+
+    if (studentId) {
+      const studentEnrollments = await db
+        .select({ courseId: courseEnrollments.courseId })
+        .from(courseEnrollments)
+        .where(
+          and(
+            eq(courseEnrollments.studentId, studentId),
+            eq(courseEnrollments.isActive, true)
+          )
+        );
+      
+      const enrolledCourseIds = studentEnrollments.map(e => e.courseId);
+      
+      if (enrolledCourseIds.length === 0) {
+        return [];
+      }
+      
+      schedulesData = await db
+        .select({
+          schedule: schedules,
+          course: courses,
+          topic: topics,
+          instructor: users,
+        })
+        .from(schedules)
+        .innerJoin(courses, eq(schedules.courseId, courses.id))
+        .leftJoin(topics, eq(schedules.topicId, topics.id))
+        .innerJoin(users, eq(schedules.instructorId, users.id))
+        .where(inArray(schedules.courseId, enrolledCourseIds))
+        .orderBy(schedules.startTime);
+    } else {
+      schedulesData = await db
+        .select({
+          schedule: schedules,
+          course: courses,
+          topic: topics,
+          instructor: users,
+        })
+        .from(schedules)
+        .innerJoin(courses, eq(schedules.courseId, courses.id))
+        .leftJoin(topics, eq(schedules.topicId, topics.id))
+        .innerJoin(users, eq(schedules.instructorId, users.id))
+        .orderBy(schedules.startTime);
+    }
+
+    const result = await Promise.all(
+      schedulesData.map(async (row) => {
+        const registrationCount = await this.getSessionRegistrationCount(row.schedule.id);
+        const isRegistered = studentId
+          ? await this.isStudentRegistered(row.schedule.id, studentId)
+          : undefined;
+
+        return {
+          ...row.schedule,
+          course: row.course,
+          topic: row.topic,
+          instructor: row.instructor,
+          registeredStudentsCount: registrationCount,
+          isRegistered,
+        };
+      })
+    );
+
+    return result;
   }
 
   async createSchedule(scheduleData: InsertSchedule): Promise<Schedule> {
