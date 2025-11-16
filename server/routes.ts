@@ -932,6 +932,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin/Instructor schedule routes
+  app.get('/api/admin/courses/:courseId/schedules', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { courseId } = req.params;
+      const schedules = await storage.getSchedulesByCourse(courseId);
+      
+      const schedulesWithDetails = await Promise.all(
+        schedules.map(async (schedule) => {
+          const instructor = await storage.getUser(schedule.instructorId);
+          const topic = schedule.topicId ? await storage.getTopic(schedule.topicId) : null;
+          const registeredCount = await storage.getSessionRegistrationCount(schedule.id);
+          
+          return {
+            ...schedule,
+            instructorName: instructor?.name,
+            topicName: topic?.name,
+            registeredCount,
+          };
+        })
+      );
+      
+      res.json(schedulesWithDetails);
+    } catch (error) {
+      console.error("Error fetching course schedules:", error);
+      res.status(500).json({ message: "Failed to fetch course schedules" });
+    }
+  });
+
+  app.post('/api/admin/courses/:courseId/schedules', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { courseId } = req.params;
+      const scheduleData = insertScheduleSchema.parse({ ...req.body, courseId });
+      const schedule = await storage.createSchedule(scheduleData);
+      
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "CREATE_SCHEDULE",
+          entityType: "schedule",
+          entityId: schedule.id,
+        });
+      }
+      
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error creating schedule:", error);
+      res.status(500).json({ message: "Failed to create schedule" });
+    }
+  });
+
+  app.patch('/api/admin/schedules/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const scheduleData = insertScheduleSchema.partial().parse(req.body);
+      const schedule = await storage.updateSchedule(id, scheduleData);
+      
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "UPDATE_SCHEDULE",
+          entityType: "schedule",
+          entityId: id,
+        });
+      }
+      
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error updating schedule:", error);
+      res.status(500).json({ message: "Failed to update schedule" });
+    }
+  });
+
+  app.delete('/api/admin/schedules/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteSchedule(id);
+      
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "DELETE_SCHEDULE",
+          entityType: "schedule",
+          entityId: id,
+        });
+      }
+      
+      res.json({ message: "Schedule deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting schedule:", error);
+      res.status(500).json({ message: "Failed to delete schedule" });
+    }
+  });
+
   // Admin test template routes
   app.get('/api/admin/test-templates', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
     try {
