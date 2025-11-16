@@ -106,6 +106,21 @@ export default function TakeTest() {
   }
 
   const { questions } = testData;
+  
+  // Check if test has no questions
+  if (!questions || questions.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Alert className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            This test has no questions. Please contact your instructor or administrator.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+  
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
   const answeredCount = Object.keys(answers).length;
