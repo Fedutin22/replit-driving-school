@@ -3,26 +3,109 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
+import Landing from "@/pages/landing";
+import Home from "@/pages/home";
+import Courses from "@/pages/courses";
+import Tests from "@/pages/tests";
+import SchedulePage from "@/pages/schedule";
+import Payments from "@/pages/payments";
+import Certificates from "@/pages/certificates";
+import Questions from "@/pages/questions";
+import AdminDashboard from "@/pages/admin/dashboard";
+import AdminUsers from "@/pages/admin/users";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
 
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      {!isAuthenticated ? (
+        <Route path="/" component={Landing} />
+      ) : (
+        <>
+          <Route path="/" component={Home} />
+          <Route path="/courses" component={Courses} />
+          <Route path="/tests" component={Tests} />
+          <Route path="/schedule" component={SchedulePage} />
+          <Route path="/payments" component={Payments} />
+          <Route path="/certificates" component={Certificates} />
+          <Route path="/questions" component={Questions} />
+          <Route path="/admin" component={AdminDashboard} />
+          <Route path="/admin/users" component={AdminUsers} />
+        </>
+      )}
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+function AppContent() {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  const sidebarStyle = {
+    "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "3rem",
+  } as React.CSSProperties;
+
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  return (
+    <TooltipProvider>
+      {isAuthenticated ? (
+        <SidebarProvider style={sidebarStyle}>
+          <div className="flex h-screen w-full">
+            <AppSidebar />
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <header className="flex items-center justify-between p-4 border-b border-border bg-background">
+                <SidebarTrigger data-testid="button-sidebar-toggle" />
+                <Button variant="ghost" size="sm" asChild data-testid="button-logout">
+                  <a href="/api/logout">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Log Out
+                  </a>
+                </Button>
+              </header>
+              <main className="flex-1 overflow-auto bg-background">
+                <Router />
+              </main>
+            </div>
+          </div>
+        </SidebarProvider>
+      ) : (
+        <Router />
+      )}
+      <Toaster />
+    </TooltipProvider>
   );
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <AppContent />
     </QueryClientProvider>
   );
 }
