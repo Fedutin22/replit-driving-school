@@ -8,6 +8,8 @@ import {
   testQuestions,
   testInstances,
   courseEnrollments,
+  topicAssessments,
+  topicAssessmentQuestions,
   schedules,
   sessionRegistrations,
   attendance,
@@ -31,6 +33,10 @@ import {
   type TestInstance,
   type InsertCourseEnrollment,
   type CourseEnrollment,
+  type InsertTopicAssessment,
+  type TopicAssessment,
+  type InsertTopicAssessmentQuestion,
+  type TopicAssessmentQuestion,
   type InsertSchedule,
   type Schedule,
   type InsertPayment,
@@ -80,7 +86,7 @@ export interface IStorage {
   updateQuestion(id: string, data: Partial<Question>): Promise<Question>;
   deleteQuestion(id: string): Promise<void>;
   
-  // Test template operations
+  // Test template operations (legacy)
   getTestTemplates(): Promise<TestTemplate[]>;
   getTestTemplate(id: string): Promise<TestTemplate | undefined>;
   getTestTemplatesByCourse(courseId: string): Promise<TestTemplate[]>;
@@ -91,12 +97,24 @@ export interface IStorage {
   removeQuestionFromTest(testTemplateId: string, questionId: string): Promise<void>;
   reorderTestQuestions(testTemplateId: string, questionOrders: Array<{questionId: string, orderIndex: number}>): Promise<void>;
   
+  // Topic assessment operations
+  getTopicAssessments(topicId: string): Promise<TopicAssessment[]>;
+  getTopicAssessment(id: string): Promise<TopicAssessment | undefined>;
+  createTopicAssessment(assessment: InsertTopicAssessment): Promise<TopicAssessment>;
+  updateTopicAssessment(id: string, data: Partial<TopicAssessment>): Promise<TopicAssessment>;
+  deleteTopicAssessment(id: string): Promise<void>;
+  getAssessmentQuestions(assessmentId: string): Promise<Array<{ id: string; assessmentId: string; questionId: string; orderIndex: number; question: Question }>>;
+  addQuestionToAssessment(assessmentId: string, questionId: string, orderIndex: number): Promise<any>;
+  removeQuestionFromAssessment(assessmentId: string, questionId: string): Promise<void>;
+  reorderAssessmentQuestions(assessmentId: string, questionOrders: Array<{questionId: string, orderIndex: number}>): Promise<void>;
+  
   // Test instance operations
   createTestInstance(instance: InsertTestInstance): Promise<TestInstance>;
   getTestInstance(id: string): Promise<TestInstance | undefined>;
   updateTestInstance(id: string, data: Partial<TestInstance>): Promise<TestInstance>;
   getTestInstancesByStudent(studentId: string): Promise<TestInstance[]>;
-  startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>;
+  startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>; // Legacy
+  startAssessment(assessmentId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>;
   submitTest(testInstanceId: string, answers: Record<string, any>): Promise<TestInstance>;
   
   // Enrollment operations
@@ -556,6 +574,106 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
+  // Topic assessment operations
+  async getTopicAssessments(topicId: string): Promise<TopicAssessment[]> {
+    return await db
+      .select()
+      .from(topicAssessments)
+      .where(eq(topicAssessments.topicId, topicId))
+      .orderBy(topicAssessments.orderIndex);
+  }
+
+  async getTopicAssessment(id: string): Promise<TopicAssessment | undefined> {
+    const [assessment] = await db
+      .select()
+      .from(topicAssessments)
+      .where(eq(topicAssessments.id, id));
+    return assessment || undefined;
+  }
+
+  async createTopicAssessment(assessmentData: InsertTopicAssessment): Promise<TopicAssessment> {
+    const [assessment] = await db.insert(topicAssessments).values(assessmentData).returning();
+    return assessment;
+  }
+
+  async updateTopicAssessment(id: string, data: Partial<TopicAssessment>): Promise<TopicAssessment> {
+    const [assessment] = await db
+      .update(topicAssessments)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(topicAssessments.id, id))
+      .returning();
+    return assessment;
+  }
+
+  async deleteTopicAssessment(id: string): Promise<void> {
+    await db.delete(topicAssessments).where(eq(topicAssessments.id, id));
+  }
+
+  async getAssessmentQuestions(assessmentId: string): Promise<Array<{ id: string; assessmentId: string; questionId: string; orderIndex: number; question: Question }>> {
+    const assessmentQuestionsData = await db
+      .select()
+      .from(topicAssessmentQuestions)
+      .where(eq(topicAssessmentQuestions.assessmentId, assessmentId))
+      .orderBy(topicAssessmentQuestions.orderIndex);
+
+    const questionsList = await Promise.all(
+      assessmentQuestionsData.map(async (aq) => {
+        const [question] = await db
+          .select()
+          .from(questions)
+          .where(eq(questions.id, aq.questionId));
+        return {
+          id: aq.id,
+          assessmentId: aq.assessmentId,
+          questionId: aq.questionId,
+          orderIndex: aq.orderIndex,
+          question,
+        };
+      })
+    );
+
+    return questionsList;
+  }
+
+  async addQuestionToAssessment(assessmentId: string, questionId: string, orderIndex: number): Promise<any> {
+    const [assessmentQuestion] = await db
+      .insert(topicAssessmentQuestions)
+      .values({
+        assessmentId,
+        questionId,
+        orderIndex,
+      })
+      .returning();
+    return assessmentQuestion;
+  }
+
+  async removeQuestionFromAssessment(assessmentId: string, questionId: string): Promise<void> {
+    await db
+      .delete(topicAssessmentQuestions)
+      .where(
+        and(
+          eq(topicAssessmentQuestions.assessmentId, assessmentId),
+          eq(topicAssessmentQuestions.questionId, questionId)
+        )
+      );
+  }
+
+  async reorderAssessmentQuestions(assessmentId: string, questionOrders: Array<{questionId: string, orderIndex: number}>): Promise<void> {
+    await Promise.all(
+      questionOrders.map(({ questionId, orderIndex }) =>
+        db
+          .update(topicAssessmentQuestions)
+          .set({ orderIndex })
+          .where(
+            and(
+              eq(topicAssessmentQuestions.assessmentId, assessmentId),
+              eq(topicAssessmentQuestions.questionId, questionId)
+            )
+          )
+      )
+    );
+  }
+
   // Test instance operations
   async createTestInstance(instanceData: InsertTestInstance): Promise<TestInstance> {
     const [instance] = await db.insert(testInstances).values(instanceData).returning();
@@ -651,19 +769,93 @@ export class DatabaseStorage implements IStorage {
     return { testInstance, questions: questionsForClient };
   }
 
+  async startAssessment(assessmentId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }> {
+    const assessment = await this.getTopicAssessment(assessmentId);
+    if (!assessment) {
+      throw new Error('Topic assessment not found');
+    }
+
+    let questionsToServe: any[] = [];
+
+    if (assessment.mode === 'manual') {
+      // Get manually selected questions
+      const assessmentQuestionsData = await this.getAssessmentQuestions(assessmentId);
+      questionsToServe = assessmentQuestionsData.map(aq => ({
+        id: aq.question.id,
+        questionText: aq.question.questionText,
+        type: aq.question.type,
+        choices: aq.question.choices, // Keep full choices for server-side storage
+        orderIndex: aq.orderIndex,
+      }));
+    } else if (assessment.mode === 'random') {
+      // Get random questions from question bank
+      const allQuestions = await this.getQuestions();
+      const activeQuestions = allQuestions.filter(q => !q.isArchived);
+      
+      // Shuffle and take questionCount questions
+      const shuffled = activeQuestions.sort(() => Math.random() - 0.5);
+      const count = Math.min(assessment.questionCount || 10, shuffled.length);
+      questionsToServe = shuffled.slice(0, count).map((q, index) => ({
+        id: q.id,
+        questionText: q.questionText,
+        type: q.type,
+        choices: q.choices, // Keep full choices for server-side storage
+        orderIndex: index,
+      }));
+    }
+
+    // Randomize question order if assessment specifies
+    if (assessment.randomizeQuestions) {
+      questionsToServe.sort(() => Math.random() - 0.5);
+      questionsToServe.forEach((q, index) => {
+        q.orderIndex = index;
+      });
+    }
+
+    // Create test instance with questions snapshot (including correct answers for server-side validation)
+    const testInstance = await this.createTestInstance({
+      topicAssessmentId: assessmentId,
+      testTemplateId: null,
+      studentId,
+      questionsData: questionsToServe,
+      answersData: null,
+      score: null,
+      percentage: null,
+      passed: null,
+      submittedAt: null,
+    });
+
+    // Strip correct answer flags from questions before sending to client
+    const questionsForClient = questionsToServe.map(q => ({
+      id: q.id,
+      questionText: q.questionText,
+      type: q.type,
+      choices: (q.choices as any[]).map((c: any) => ({ label: c.label })), // Remove isCorrect flag
+      orderIndex: q.orderIndex,
+    }));
+
+    return { testInstance, questions: questionsForClient };
+  }
+
   async submitTest(testInstanceId: string, answers: Record<string, any>): Promise<TestInstance> {
     const instance = await this.getTestInstance(testInstanceId);
     if (!instance) {
       throw new Error('Test instance not found');
     }
 
-    if (!instance.testTemplateId) {
-      throw new Error('Legacy test template ID not found');
-    }
-
-    const template = await this.getTestTemplate(instance.testTemplateId);
-    if (!template) {
-      throw new Error('Test template not found');
+    // Determine if this is a legacy test or topic assessment
+    let passingPercentage = 70; // Default
+    
+    if (instance.topicAssessmentId) {
+      const assessment = await this.getTopicAssessment(instance.topicAssessmentId);
+      if (assessment) {
+        passingPercentage = assessment.passingPercentage;
+      }
+    } else if (instance.testTemplateId) {
+      const template = await this.getTestTemplate(instance.testTemplateId);
+      if (template) {
+        passingPercentage = template.passingPercentage;
+      }
     }
 
     const questions = instance.questionsData as any[];
@@ -691,7 +883,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const percentage = Math.round((correctCount / totalQuestions) * 100);
-    const passed = percentage >= template.passingPercentage;
+    const passed = percentage >= passingPercentage;
 
     // Update test instance
     return await this.updateTestInstance(testInstanceId, {
