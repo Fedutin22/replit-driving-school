@@ -75,7 +75,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
       name: "",
       description: "",
       type: "theory",
-      orderIndex: topics?.length || 0,
+      orderIndex: 0,
     },
   });
 
@@ -84,7 +84,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
     defaultValues: {
       title: "",
       content: "",
-      orderIndex: posts?.length || 0,
+      orderIndex: 0,
     },
   });
 
@@ -229,11 +229,14 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
       });
     } else {
       setEditingTopic(null);
+      const maxOrderIndex = topics && topics.length > 0
+        ? Math.max(...topics.map(t => t.orderIndex))
+        : -1;
       topicForm.reset({
         name: "",
         description: "",
         type: "theory",
-        orderIndex: topics?.length || 0,
+        orderIndex: maxOrderIndex + 1,
       });
     }
     setIsTopicDialogOpen(true);
@@ -249,10 +252,13 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
       });
     } else {
       setEditingPost(null);
+      const maxOrderIndex = posts && posts.length > 0
+        ? Math.max(...posts.map(p => p.orderIndex))
+        : -1;
       postForm.reset({
         title: "",
         content: "",
-        orderIndex: posts?.length || 0,
+        orderIndex: maxOrderIndex + 1,
       });
     }
     setIsPostDialogOpen(true);

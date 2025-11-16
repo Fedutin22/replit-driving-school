@@ -42,7 +42,7 @@ import {
   type AuditLog,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, lt, gt, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -202,7 +202,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTopic(topicData: InsertTopic): Promise<Topic> {
-    const [topic] = await db.insert(topics).values(topicData).returning();
+    // Calculate the next orderIndex server-side to ensure uniqueness
+    const existingTopics = await db
+      .select()
+      .from(topics)
+      .where(eq(topics.courseId, topicData.courseId));
+    
+    const maxOrderIndex = existingTopics.length > 0
+      ? Math.max(...existingTopics.map(t => t.orderIndex))
+      : -1;
+    
+    const [topic] = await db.insert(topics).values({
+      ...topicData,
+      orderIndex: maxOrderIndex + 1,
+    }).returning();
     return topic;
   }
 
@@ -224,23 +237,29 @@ export class DatabaseStorage implements IStorage {
     if (!topic[0]) throw new Error("Topic not found");
 
     const currentIndex = topic[0].orderIndex;
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
 
-    // Find the topic at the target position
+    // Find the nearest neighbor in the specified direction
     const targetTopic = await db
       .select()
       .from(topics)
       .where(and(
         eq(topics.courseId, topic[0].courseId),
-        eq(topics.orderIndex, newIndex)
+        direction === 'up'
+          ? lt(topics.orderIndex, currentIndex)
+          : gt(topics.orderIndex, currentIndex)
       ))
+      .orderBy(direction === 'up' ? desc(topics.orderIndex) : asc(topics.orderIndex))
       .limit(1);
 
-    if (targetTopic[0]) {
-      // Swap order indices
-      await db.update(topics).set({ orderIndex: newIndex }).where(eq(topics.id, id));
-      await db.update(topics).set({ orderIndex: currentIndex }).where(eq(topics.id, targetTopic[0].id));
+    if (!targetTopic[0]) {
+      throw new Error(`Cannot move ${direction} - already at ${direction === 'up' ? 'top' : 'bottom'}`);
     }
+
+    // Swap order indices in a transaction
+    await db.transaction(async (tx) => {
+      await tx.update(topics).set({ orderIndex: targetTopic[0].orderIndex }).where(eq(topics.id, id));
+      await tx.update(topics).set({ orderIndex: currentIndex }).where(eq(topics.id, targetTopic[0].id));
+    });
   }
 
   // Post operations
@@ -253,7 +272,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPost(postData: InsertPost): Promise<Post> {
-    const [post] = await db.insert(posts).values(postData).returning();
+    // Calculate the next orderIndex server-side to ensure uniqueness
+    const existingPosts = await db
+      .select()
+      .from(posts)
+      .where(eq(posts.topicId, postData.topicId));
+    
+    const maxOrderIndex = existingPosts.length > 0
+      ? Math.max(...existingPosts.map(p => p.orderIndex))
+      : -1;
+    
+    const [post] = await db.insert(posts).values({
+      ...postData,
+      orderIndex: maxOrderIndex + 1,
+    }).returning();
     return post;
   }
 
@@ -275,23 +307,29 @@ export class DatabaseStorage implements IStorage {
     if (!post[0]) throw new Error("Post not found");
 
     const currentIndex = post[0].orderIndex;
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
 
-    // Find the post at the target position
+    // Find the nearest neighbor in the specified direction
     const targetPost = await db
       .select()
       .from(posts)
       .where(and(
         eq(posts.topicId, post[0].topicId),
-        eq(posts.orderIndex, newIndex)
+        direction === 'up'
+          ? lt(posts.orderIndex, currentIndex)
+          : gt(posts.orderIndex, currentIndex)
       ))
+      .orderBy(direction === 'up' ? desc(posts.orderIndex) : asc(posts.orderIndex))
       .limit(1);
 
-    if (targetPost[0]) {
-      // Swap order indices
-      await db.update(posts).set({ orderIndex: newIndex }).where(eq(posts.id, id));
-      await db.update(posts).set({ orderIndex: currentIndex }).where(eq(posts.id, targetPost[0].id));
+    if (!targetPost[0]) {
+      throw new Error(`Cannot move ${direction} - already at ${direction === 'up' ? 'top' : 'bottom'}`);
     }
+
+    // Swap order indices in a transaction
+    await db.transaction(async (tx) => {
+      await tx.update(posts).set({ orderIndex: targetPost[0].orderIndex }).where(eq(posts.id, id));
+      await tx.update(posts).set({ orderIndex: currentIndex }).where(eq(posts.id, targetPost[0].id));
+    });
   }
 
   // Question operations
