@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash, FileText, List, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Edit, Trash, FileText, List, ArrowUp, ArrowDown, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Course, Topic, Post, TopicAssessment, Question } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -64,6 +64,8 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
   const [isTopicDialogOpen, setIsTopicDialogOpen] = useState(false);
   const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
   const [isAssessmentDialogOpen, setIsAssessmentDialogOpen] = useState(false);
+  const [questionSearchTerm, setQuestionSearchTerm] = useState("");
+  const [questionTagFilter, setQuestionTagFilter] = useState<string>("all");
 
   const { data: topics, isLoading: topicsLoading } = useQuery<Topic[]>({
     queryKey: ["/api/topics", course.id],
@@ -107,6 +109,32 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
     },
     enabled: !!selectedTopicForAssessments,
   });
+
+  // Get all unique tags from questions
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    allQuestions.forEach(q => {
+      if (Array.isArray(q.tags)) {
+        q.tags.forEach(tag => tagSet.add(tag));
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [allQuestions]);
+
+  // Filter questions based on search and tag filter
+  const filteredQuestions = useMemo(() => {
+    return allQuestions.filter(question => {
+      // Search filter
+      const matchesSearch = !questionSearchTerm || 
+        question.questionText.toLowerCase().includes(questionSearchTerm.toLowerCase());
+      
+      // Tag filter
+      const matchesTag = questionTagFilter === "all" || 
+        (Array.isArray(question.tags) && question.tags.includes(questionTagFilter));
+      
+      return matchesSearch && matchesTag;
+    });
+  }, [allQuestions, questionSearchTerm, questionTagFilter]);
 
   const topicForm = useForm<TopicForm>({
     resolver: zodResolver(topicSchema),
@@ -1014,45 +1042,128 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                     <FormItem>
                       <FormLabel>Select Questions</FormLabel>
                       <FormControl>
-                        <div className="border rounded-md p-4 max-h-64 overflow-y-auto space-y-2" data-testid="question-selector">
+                        <div className="border rounded-md" data-testid="question-selector">
                           {allQuestions.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No questions available. Create questions first.</p>
+                            <p className="text-sm text-muted-foreground p-4">No questions available. Create questions first.</p>
                           ) : (
-                            allQuestions.map((question) => (
-                              <div key={question.id} className="flex items-start space-x-2">
-                                <input
-                                  type="checkbox"
-                                  checked={field.value?.includes(question.id) || false}
-                                  onChange={(e) => {
-                                    const currentIds = field.value || [];
-                                    if (e.target.checked) {
-                                      field.onChange([...currentIds, question.id]);
-                                    } else {
-                                      field.onChange(currentIds.filter((id: string) => id !== question.id));
-                                    }
-                                  }}
-                                  data-testid={`checkbox-question-${question.id}`}
-                                  className="h-4 w-4 mt-1"
-                                />
-                                <label className="text-sm flex-1 cursor-pointer">
-                                  {question.questionText}
-                                  {Array.isArray(question.tags) && question.tags.length > 0 && (
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      ({question.tags.join(", ")})
-                                    </span>
-                                  )}
-                                </label>
+                            <div className="space-y-3">
+                              {/* Search and Filter Controls */}
+                              <div className="p-3 border-b space-y-3">
+                                <div className="flex gap-2">
+                                  <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Search questions..."
+                                      value={questionSearchTerm}
+                                      onChange={(e) => setQuestionSearchTerm(e.target.value)}
+                                      className="pl-9"
+                                      data-testid="input-search-questions"
+                                    />
+                                    {questionSearchTerm && (
+                                      <button
+                                        onClick={() => setQuestionSearchTerm("")}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  <Select value={questionTagFilter} onValueChange={setQuestionTagFilter}>
+                                    <SelectTrigger className="w-48" data-testid="select-tag-filter">
+                                      <SelectValue placeholder="Filter by tag" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="all">All Tags</SelectItem>
+                                      {allTags.map(tag => (
+                                        <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                
+                                {/* Stats and Actions */}
+                                <div className="flex items-center justify-between">
+                                  <div className="text-sm text-muted-foreground">
+                                    {field.value?.length || 0} selected · {filteredQuestions.length} shown · {allQuestions.length} total
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const visibleIds = filteredQuestions.map(q => q.id);
+                                        const currentIds = field.value || [];
+                                        const newIds = Array.from(new Set([...currentIds, ...visibleIds]));
+                                        field.onChange(newIds);
+                                      }}
+                                      data-testid="button-select-all"
+                                    >
+                                      Select All
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => field.onChange([])}
+                                      data-testid="button-clear-all"
+                                    >
+                                      Clear All
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
-                            ))
+
+                              {/* Question List */}
+                              <div className="max-h-80 overflow-y-auto px-3 pb-3">
+                                {filteredQuestions.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground text-center py-8">
+                                    No questions match your search or filter.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {filteredQuestions.map((question) => (
+                                      <div
+                                        key={question.id}
+                                        className="flex items-start space-x-3 p-2 rounded hover-elevate cursor-pointer"
+                                        onClick={() => {
+                                          const currentIds = field.value || [];
+                                          if (currentIds.includes(question.id)) {
+                                            field.onChange(currentIds.filter((id: string) => id !== question.id));
+                                          } else {
+                                            field.onChange([...currentIds, question.id]);
+                                          }
+                                        }}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={field.value?.includes(question.id) || false}
+                                          onChange={() => {}} // Handled by parent div onClick
+                                          data-testid={`checkbox-question-${question.id}`}
+                                          className="h-4 w-4 mt-1"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm">{question.questionText}</p>
+                                          {Array.isArray(question.tags) && question.tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                              {question.tags.map(tag => (
+                                                <Badge key={tag} variant="secondary" className="text-xs">
+                                                  {tag}
+                                                </Badge>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           )}
                         </div>
                       </FormControl>
                       <FormMessage />
-                      {field.value && field.value.length > 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          {field.value.length} question{field.value.length !== 1 ? "s" : ""} selected
-                        </p>
-                      )}
                     </FormItem>
                   )}
                 />
