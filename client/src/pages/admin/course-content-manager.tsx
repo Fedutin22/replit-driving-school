@@ -1129,7 +1129,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                 </div>
 
                 {/* Question List */}
-                <div className="border rounded-md h-[500px] overflow-y-auto minimal-scrollbar">
+                <div className="border rounded-md h-[240px] overflow-y-auto minimal-scrollbar">
                   {isSearching ? (
                     <p className="text-sm text-muted-foreground text-center py-8">Searching...</p>
                   ) : searchedQuestions.length === 0 ? (
