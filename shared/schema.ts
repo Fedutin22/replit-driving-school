@@ -73,7 +73,6 @@ export const courses = pgTable("courses", {
 export const coursesRelations = relations(courses, ({ many }) => ({
   topics: many(topics),
   enrollments: many(courseEnrollments),
-  completionTests: many(courseCompletionTests),
   schedules: many(schedules),
   payments: many(payments),
   certificates: many(certificates),
@@ -98,6 +97,7 @@ export const topicsRelations = relations(topics, ({ one, many }) => ({
   }),
   schedules: many(schedules),
   posts: many(posts),
+  assessments: many(topicAssessments),
 }));
 
 // Posts table (course content within topics)
@@ -133,9 +133,35 @@ export const questions = pgTable("questions", {
 
 export const questionsRelations = relations(questions, ({ many }) => ({
   testQuestions: many(testQuestions),
+  assessmentQuestions: many(topicAssessmentQuestions),
 }));
 
-// Test templates table - Reusable across multiple courses
+// Topic assessments table - Tests linked to specific topics
+export const topicAssessments = pgTable("topic_assessments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  topicId: varchar("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  mode: testModeEnum("mode").notNull(),
+  questionCount: integer("question_count"), // For random mode
+  randomizeQuestions: boolean("randomize_questions").notNull().default(false),
+  passingPercentage: integer("passing_percentage").notNull().default(70),
+  isRequired: boolean("is_required").notNull().default(false), // Required for course completion
+  orderIndex: integer("order_index").notNull().default(0), // Position within topic content
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const topicAssessmentsRelations = relations(topicAssessments, ({ one, many }) => ({
+  topic: one(topics, {
+    fields: [topicAssessments.topicId],
+    references: [topics.id],
+  }),
+  assessmentQuestions: many(topicAssessmentQuestions),
+  testInstances: many(testInstances),
+}));
+
+// Legacy test templates table - Kept for backward compatibility (will be migrated to topic assessments)
 export const testTemplates = pgTable("test_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name", { length: 255 }).notNull(),
@@ -150,11 +176,28 @@ export const testTemplates = pgTable("test_templates", {
 
 export const testTemplatesRelations = relations(testTemplates, ({ many }) => ({
   testQuestions: many(testQuestions),
-  testInstances: many(testInstances),
-  completionTests: many(courseCompletionTests),
 }));
 
-// Test questions (for manual mode - links questions to templates)
+// Topic assessment questions (for manual mode - links questions to assessments)
+export const topicAssessmentQuestions = pgTable("topic_assessment_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assessmentId: varchar("assessment_id").notNull().references(() => topicAssessments.id, { onDelete: "cascade" }),
+  questionId: varchar("question_id").notNull().references(() => questions.id, { onDelete: "cascade" }),
+  orderIndex: integer("order_index").notNull().default(0),
+});
+
+export const topicAssessmentQuestionsRelations = relations(topicAssessmentQuestions, ({ one }) => ({
+  assessment: one(topicAssessments, {
+    fields: [topicAssessmentQuestions.assessmentId],
+    references: [topicAssessments.id],
+  }),
+  question: one(questions, {
+    fields: [topicAssessmentQuestions.questionId],
+    references: [questions.id],
+  }),
+}));
+
+// Legacy test questions (for manual mode - links questions to templates)
 export const testQuestions = pgTable("test_questions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   testTemplateId: varchar("test_template_id").notNull().references(() => testTemplates.id, { onDelete: "cascade" }),
@@ -176,7 +219,8 @@ export const testQuestionsRelations = relations(testQuestions, ({ one }) => ({
 // Test instances (actual tests taken by students)
 export const testInstances = pgTable("test_instances", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  testTemplateId: varchar("test_template_id").notNull().references(() => testTemplates.id, { onDelete: "restrict" }),
+  topicAssessmentId: varchar("topic_assessment_id").references(() => topicAssessments.id, { onDelete: "restrict" }),
+  testTemplateId: varchar("test_template_id").references(() => testTemplates.id, { onDelete: "restrict" }), // Legacy support
   studentId: varchar("student_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   questionsData: jsonb("questions_data").notNull(), // Snapshot of questions served
   answersData: jsonb("answers_data"), // Student's answers
@@ -189,6 +233,10 @@ export const testInstances = pgTable("test_instances", {
 });
 
 export const testInstancesRelations = relations(testInstances, ({ one }) => ({
+  topicAssessment: one(topicAssessments, {
+    fields: [testInstances.topicAssessmentId],
+    references: [topicAssessments.id],
+  }),
   testTemplate: one(testTemplates, {
     fields: [testInstances.testTemplateId],
     references: [testTemplates.id],
@@ -223,24 +271,7 @@ export const courseEnrollmentsRelations = relations(courseEnrollments, ({ one })
   }),
 }));
 
-// Course completion tests (required tests for course completion)
-export const courseCompletionTests = pgTable("course_completion_tests", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
-  testTemplateId: varchar("test_template_id").notNull().references(() => testTemplates.id, { onDelete: "cascade" }),
-  minScore: integer("min_score"), // Optional minimum score override
-});
-
-export const courseCompletionTestsRelations = relations(courseCompletionTests, ({ one }) => ({
-  course: one(courses, {
-    fields: [courseCompletionTests.courseId],
-    references: [courses.id],
-  }),
-  testTemplate: one(testTemplates, {
-    fields: [courseCompletionTests.testTemplateId],
-    references: [testTemplates.id],
-  }),
-}));
+// Removed: courseCompletionTests table - completion now determined by required topic assessments
 
 // Schedules
 export const schedules = pgTable("schedules", {
@@ -419,8 +450,11 @@ export type TestInstance = typeof testInstances.$inferSelect;
 export type InsertCourseEnrollment = typeof courseEnrollments.$inferInsert;
 export type CourseEnrollment = typeof courseEnrollments.$inferSelect;
 
-export type InsertCourseCompletionTest = typeof courseCompletionTests.$inferInsert;
-export type CourseCompletionTest = typeof courseCompletionTests.$inferSelect;
+export type InsertTopicAssessment = typeof topicAssessments.$inferInsert;
+export type TopicAssessment = typeof topicAssessments.$inferSelect;
+
+export type InsertTopicAssessmentQuestion = typeof topicAssessmentQuestions.$inferInsert;
+export type TopicAssessmentQuestion = typeof topicAssessmentQuestions.$inferSelect;
 
 export type InsertSchedule = typeof schedules.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
@@ -469,6 +503,12 @@ export const insertQuestionSchema = createInsertSchema(questions).omit({
 });
 
 export const insertTestTemplateSchema = createInsertSchema(testTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTopicAssessmentSchema = createInsertSchema(topicAssessments).omit({
   id: true,
   createdAt: true,
   updatedAt: true,

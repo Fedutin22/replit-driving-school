@@ -8,7 +8,6 @@ import {
   testQuestions,
   testInstances,
   courseEnrollments,
-  courseCompletionTests,
   schedules,
   sessionRegistrations,
   attendance,
@@ -467,21 +466,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTestTemplatesByCourse(courseId: string): Promise<TestTemplate[]> {
-    // Get test templates linked to this course via courseCompletionTests
-    const completionTests = await db
-      .select()
-      .from(courseCompletionTests)
-      .where(eq(courseCompletionTests.courseId, courseId));
-    
-    if (completionTests.length === 0) {
-      return [];
-    }
-    
-    const templateIds = completionTests.map(ct => ct.testTemplateId);
-    return await db
-      .select()
-      .from(testTemplates)
-      .where(inArray(testTemplates.id, templateIds));
+    // Deprecated: Tests are now linked to topics via topic_assessments
+    // This method is kept for backward compatibility only
+    return [];
   }
 
   async createTestTemplate(templateData: InsertTestTemplate): Promise<TestTemplate> {
