@@ -127,11 +127,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/courses', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const courses = await storage.getCourses();
+      const coursesWithCounts = await storage.getCoursesWithScheduleCount();
       const enrollments = await storage.getEnrollmentsByStudent(userId);
       const payments = await storage.getPaymentsByStudent(userId);
 
-      const coursesWithDetails = courses.map(course => {
+      const coursesWithDetails = coursesWithCounts.map(course => {
         const enrollment = enrollments.find(e => e.courseId === course.id);
         const payment = payments.find(p => p.courseId === course.id);
         return {

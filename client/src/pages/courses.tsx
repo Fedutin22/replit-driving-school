@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, Clock, DollarSign, CheckCircle2, XCircle } from "lucide-react";
+import { BookOpen, Clock, DollarSign, CheckCircle2, XCircle, Calendar } from "lucide-react";
 import type { Course, CourseEnrollment, Payment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,7 @@ interface CourseWithEnrollment extends Course {
   progress?: number;
   completedTopics?: number;
   totalTopics?: number;
+  scheduleCount: number;
 }
 
 export default function Courses() {
@@ -137,6 +138,12 @@ export default function Courses() {
                       <span className="text-muted-foreground">{course.category}</span>
                     </div>
                   )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground" data-testid={`text-schedule-count-${course.id}`}>
+                      {course.scheduleCount} {course.scheduleCount === 1 ? 'session' : 'sessions'} scheduled
+                    </span>
+                  </div>
                   {course.progress !== undefined && (
                     <div>
                       <div className="flex justify-between items-center mb-2">
@@ -190,6 +197,12 @@ export default function Courses() {
                       <span className="text-muted-foreground">{course.category}</span>
                     </div>
                   )}
+                  <div className="flex items-center gap-2 text-sm">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground" data-testid={`text-schedule-count-available-${course.id}`}>
+                      {course.scheduleCount} {course.scheduleCount === 1 ? 'session' : 'sessions'} scheduled
+                    </span>
+                  </div>
                   {course.price && (
                     <div className="flex items-center gap-2 text-sm">
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
