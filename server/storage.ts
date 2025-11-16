@@ -60,7 +60,7 @@ export interface IStorage {
   // Course operations
   getCourses(): Promise<Course[]>;
   getCourse(id: string): Promise<Course | undefined>;
-  getCourseWithContent(id: string): Promise<{ course: Course; topics: Array<Topic & { posts: Post[] }>; tests: TestTemplate[] } | undefined>;
+  getCourseWithContent(id: string): Promise<{ course: Course; topics: Array<Topic & { posts: Post[]; assessments: TopicAssessment[] }>; tests: TestTemplate[] } | undefined>;
   createCourse(course: InsertCourse): Promise<Course>;
   updateCourse(id: string, data: Partial<Course>): Promise<Course>;
   
@@ -251,23 +251,24 @@ export class DatabaseStorage implements IStorage {
     return course;
   }
 
-  async getCourseWithContent(id: string): Promise<{ course: Course; topics: Array<Topic & { posts: Post[] }>; tests: TestTemplate[] } | undefined> {
+  async getCourseWithContent(id: string): Promise<{ course: Course; topics: Array<Topic & { posts: Post[]; assessments: TopicAssessment[] }>; tests: TestTemplate[] } | undefined> {
     const course = await this.getCourse(id);
     if (!course) return undefined;
 
-    // Get topics with posts
+    // Get topics with posts and assessments
     const topicsData = await this.getTopicsByCourse(id);
-    const topicsWithPosts = await Promise.all(
+    const topicsWithContent = await Promise.all(
       topicsData.map(async (topic) => {
         const posts = await this.getPostsByTopic(topic.id);
-        return { ...topic, posts };
+        const assessments = await this.getTopicAssessments(topic.id);
+        return { ...topic, posts, assessments };
       })
     );
 
-    // Get test templates for this course
+    // Get test templates for this course (legacy)
     const tests = await this.getTestTemplatesByCourse(id);
 
-    return { course, topics: topicsWithPosts, tests };
+    return { course, topics: topicsWithContent, tests };
   }
 
   // Topic operations
