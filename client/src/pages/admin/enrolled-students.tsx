@@ -48,7 +48,7 @@ interface EnrolledStudentsProps {
 
 export function EnrolledStudents({ course, open, onClose }: EnrolledStudentsProps) {
   const { data: students, isLoading } = useQuery<EnrolledStudent[]>({
-    queryKey: ["/api/admin/courses", course.id, "enrolled-students"],
+    queryKey: [`/api/admin/courses/${course.id}/enrolled-students`],
     enabled: open,
   });
 
