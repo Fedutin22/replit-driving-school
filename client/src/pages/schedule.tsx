@@ -147,6 +147,35 @@ export default function SchedulePage() {
 
   const isStudent = user?.role === 'student';
 
+  // Get dynamic time range from schedules
+  const getTimeRange = () => {
+    if (!filteredSchedules || filteredSchedules.length === 0) {
+      return { minHour: 8, maxHour: 22 };
+    }
+    
+    let minHour = 24;
+    let maxHour = 0;
+    
+    filteredSchedules.forEach(schedule => {
+      const start = new Date(schedule.startTime);
+      const end = new Date(schedule.endTime);
+      const startHour = start.getHours();
+      const endHour = end.getHours() + (end.getMinutes() > 0 ? 1 : 0);
+      
+      minHour = Math.min(minHour, startHour);
+      maxHour = Math.max(maxHour, endHour);
+    });
+    
+    // Ensure at least 8:00-22:00 range
+    minHour = Math.min(8, minHour);
+    maxHour = Math.max(22, maxHour);
+    
+    return { minHour, maxHour };
+  };
+
+  const { minHour, maxHour } = getTimeRange();
+  const timeSlots = Array.from({ length: maxHour - minHour + 1 }, (_, i) => i + minHour);
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -198,145 +227,181 @@ export default function SchedulePage() {
             Week of {format(currentWeekStart, "MMMM d, yyyy")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <div className="space-y-4">
+            <div className="space-y-4 p-6">
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-32 w-full" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-              {weekDays.map((day, index) => {
-                const daySchedules = getSchedulesForDay(day);
-                const isToday = isSameDay(day, new Date());
+            <div className="overflow-x-auto">
+              <div className="min-w-[800px]">
+                {/* Header with day names */}
+                <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b sticky top-0 bg-background z-10">
+                  <div className="p-3 border-r bg-muted/30"></div>
+                  {weekDays.map((day, index) => {
+                    const isToday = isSameDay(day, new Date());
+                    return (
+                      <div
+                        key={index}
+                        className={`p-3 text-center border-r last:border-r-0 ${
+                          isToday ? "bg-primary/5" : "bg-muted/30"
+                        }`}
+                      >
+                        <div className="text-sm text-muted-foreground font-medium">
+                          {format(day, "EEE")}
+                        </div>
+                        <div className={`text-lg font-semibold ${isToday ? "text-primary" : ""}`}>
+                          {format(day, "d")}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
-                return (
-                  <div
-                    key={index}
-                    className={`border rounded-md p-3 ${
-                      isToday ? "border-primary bg-primary/5" : ""
-                    }`}
-                    data-testid={`day-column-${index}`}
-                  >
-                    <div className="font-semibold mb-2 text-center">
-                      <div className="text-sm text-muted-foreground">
-                        {format(day, "EEE")}
+                {/* Calendar grid with time axis */}
+                <div className="grid grid-cols-[80px_repeat(7,1fr)]">
+                  {/* Time labels column */}
+                  <div className="border-r bg-muted/30">
+                    {timeSlots.map((hour) => (
+                      <div 
+                        key={hour} 
+                        className="h-16 flex items-start justify-end pr-3 pt-1 text-xs text-muted-foreground font-medium border-b"
+                      >
+                        {hour}:00
                       </div>
-                      <div className={`text-lg ${isToday ? "text-primary" : ""}`}>
-                        {format(day, "d")}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      {daySchedules.length === 0 ? (
-                        <p className="text-xs text-muted-foreground text-center py-4">
-                          No sessions
-                        </p>
-                      ) : (
-                        daySchedules.map((schedule) => {
-                          const availableSeats = schedule.capacity - schedule.registeredStudentsCount;
-                          const isFull = availableSeats <= 0;
+                    ))}
+                  </div>
+
+                  {/* Day columns */}
+                  {weekDays.map((day, dayIndex) => {
+                    const daySchedules = getSchedulesForDay(day);
+                    const isToday = isSameDay(day, new Date());
+
+                    return (
+                      <div
+                        key={dayIndex}
+                        className={`border-r last:border-r-0 ${
+                          isToday ? "bg-primary/[0.02]" : ""
+                        }`}
+                      >
+                        {timeSlots.map((hour) => {
+                          // Find schedules that fall in this hour
+                          const hourSchedules = daySchedules.filter(schedule => {
+                            const start = new Date(schedule.startTime);
+                            const startHour = start.getHours();
+                            return startHour === hour;
+                          });
 
                           return (
-                            <Card
-                              key={schedule.id}
-                              className="p-2 hover-elevate"
-                              data-testid={`schedule-card-${schedule.id}`}
+                            <div
+                              key={hour}
+                              className="h-16 border-b p-1 space-y-1"
+                              data-testid={`time-slot-${hour}-${dayIndex}`}
                             >
-                              <div className="space-y-1.5">
-                                <div className="flex items-start justify-between gap-1">
-                                  <div className="flex-1 min-w-0">
-                                    <h4 className="text-xs font-semibold truncate" title={schedule.title}>
-                                      {schedule.title}
-                                    </h4>
-                                    <p className="text-xs text-muted-foreground truncate" title={schedule.course.name}>
-                                      <BookOpen className="h-3 w-3 inline mr-1" />
-                                      {schedule.course.name}
-                                    </p>
-                                  </div>
-                                  {schedule.isRegistered && (
-                                    <Badge variant="default" className="text-xs shrink-0">
-                                      Registered
-                                    </Badge>
-                                  )}
-                                </div>
+                              {hourSchedules.map((schedule) => {
+                                const availableSeats = schedule.capacity - schedule.registeredStudentsCount;
+                                const isFull = availableSeats <= 0;
 
-                                <div className="space-y-0.5 text-xs text-muted-foreground">
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    <span>
-                                      {format(parseISO(schedule.startTime.toString()), "HH:mm")} -{" "}
-                                      {format(parseISO(schedule.endTime.toString()), "HH:mm")}
-                                    </span>
-                                  </div>
+                                return (
+                                  <Card
+                                    key={schedule.id}
+                                    className="hover-elevate p-2"
+                                    data-testid={`schedule-card-${schedule.id}`}
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex items-start justify-between gap-1">
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="text-xs font-semibold truncate" title={schedule.title}>
+                                            {schedule.title}
+                                          </h4>
+                                          <p className="text-xs text-muted-foreground truncate" title={schedule.course.name}>
+                                            <BookOpen className="h-3 w-3 inline mr-1" />
+                                            {schedule.course.name}
+                                          </p>
+                                        </div>
+                                        {schedule.isRegistered && (
+                                          <Badge variant="default" className="text-xs shrink-0">
+                                            Registered
+                                          </Badge>
+                                        )}
+                                      </div>
 
-                                  <div className="flex items-center gap-1 truncate" title={schedule.instructor.firstName + " " + schedule.instructor.lastName}>
-                                    <UserIcon className="h-3 w-3" />
-                                    <span className="truncate">
-                                      {schedule.instructor.firstName} {schedule.instructor.lastName}
-                                    </span>
-                                  </div>
+                                      <div className="space-y-0.5 text-xs text-muted-foreground">
+                                        <div className="flex items-center gap-1">
+                                          <Clock className="h-3 w-3 shrink-0" />
+                                          <span className="truncate">
+                                            {format(parseISO(schedule.startTime.toString()), "HH:mm")} - {format(parseISO(schedule.endTime.toString()), "HH:mm")}
+                                          </span>
+                                        </div>
 
-                                  {schedule.location && (
-                                    <div className="flex items-center gap-1 truncate" title={schedule.location}>
-                                      <MapPin className="h-3 w-3" />
-                                      <span className="truncate">{schedule.location}</span>
+                                        <div className="flex items-center gap-1 truncate" title={schedule.instructor.firstName + " " + schedule.instructor.lastName}>
+                                          <UserIcon className="h-3 w-3 shrink-0" />
+                                          <span className="truncate">
+                                            {schedule.instructor.firstName} {schedule.instructor.lastName}
+                                          </span>
+                                        </div>
+
+                                        {schedule.location && (
+                                          <div className="flex items-center gap-1 truncate" title={schedule.location}>
+                                            <MapPin className="h-3 w-3 shrink-0" />
+                                            <span className="truncate">{schedule.location}</span>
+                                          </div>
+                                        )}
+
+                                        <div className="flex items-center gap-1">
+                                          <Users className="h-3 w-3 shrink-0" />
+                                          <span>
+                                            {schedule.registeredStudentsCount}/{schedule.capacity}
+                                          </span>
+                                          {isFull && (
+                                            <Badge variant="destructive" className="text-xs ml-1">
+                                              Full
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {isStudent && new Date(schedule.startTime) > new Date() && (
+                                        <div className="pt-1">
+                                          {schedule.isRegistered ? (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="w-full text-xs h-7"
+                                              onClick={() => unregisterMutation.mutate(schedule.id)}
+                                              disabled={unregisterMutation.isPending}
+                                              data-testid={`button-unregister-${schedule.id}`}
+                                            >
+                                              {unregisterMutation.isPending ? "Canceling..." : "Cancel"}
+                                            </Button>
+                                          ) : (
+                                            <Button
+                                              variant="default"
+                                              size="sm"
+                                              className="w-full text-xs h-7"
+                                              onClick={() => registerMutation.mutate(schedule.id)}
+                                              disabled={isFull || registerMutation.isPending}
+                                              data-testid={`button-register-${schedule.id}`}
+                                            >
+                                              {registerMutation.isPending ? "Registering..." : isFull ? "Full" : "Register"}
+                                            </Button>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-
-                                  <div className="flex items-center gap-1">
-                                    <Users className="h-3 w-3" />
-                                    <span>
-                                      {schedule.registeredStudentsCount}/{schedule.capacity}
-                                    </span>
-                                    {isFull && (
-                                      <Badge variant="destructive" className="text-xs ml-1">
-                                        Full
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {isStudent && new Date(schedule.startTime) > new Date() && (
-                                  <div className="pt-1">
-                                    {schedule.isRegistered ? (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full text-xs h-7"
-                                        onClick={() => unregisterMutation.mutate(schedule.id)}
-                                        disabled={unregisterMutation.isPending}
-                                        data-testid={`button-unregister-${schedule.id}`}
-                                      >
-                                        {unregisterMutation.isPending ? "Canceling..." : "Cancel"}
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        variant="default"
-                                        size="sm"
-                                        className="w-full text-xs h-7"
-                                        onClick={() => registerMutation.mutate(schedule.id)}
-                                        disabled={isFull || registerMutation.isPending}
-                                        data-testid={`button-register-${schedule.id}`}
-                                      >
-                                        {registerMutation.isPending
-                                          ? "Registering..."
-                                          : isFull
-                                          ? "Full"
-                                          : "Register"}
-                                      </Button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </Card>
+                                  </Card>
+                                );
+                              })}
+                            </div>
                           );
-                        })
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
