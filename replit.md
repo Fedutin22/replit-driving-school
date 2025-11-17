@@ -88,7 +88,12 @@ Preferred communication style: Simple, everyday language.
 - Dialog-based UI pattern following course content manager design
 - Storage methods: `getSchedulesByCourse`, `getSchedule`, `createSchedule`, `updateSchedule`, `deleteSchedule`, `getSchedulesWithDetails`, `getCoursesWithScheduleCount`
 - API endpoints: GET/POST `/api/admin/courses/:courseId/schedules`, PATCH/DELETE `/api/admin/schedules/:id`, GET `/api/schedules`, GET `/api/courses` (includes schedule counts)
-- Date handling: Frontend uses datetime-local inputs (ISO strings), backend schema coerces to Date objects
+- **Timezone Handling:**
+  - All schedules stored in UTC in PostgreSQL `timestamp` columns
+  - Seed script (`server/seed-b-category.ts`) uses `fromZonedTime` from date-fns-tz to convert Riga local times to UTC with DST support
+  - Frontend displays times using `toLocaleTimeString` with `timeZone: 'Europe/Riga'` to convert UTC back to Riga time
+  - DST-aware: Automatically handles Latvia's UTC+2 (winter) and UTC+3 (summer) offsets
+  - Package dependency: date-fns-tz for timezone conversions
 - **Course Management Statistics:**
   - Course management table (`/admin/courses`) displays comprehensive statistics for each course:
     - Topic count: Number of topics in the course
