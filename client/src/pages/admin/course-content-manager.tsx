@@ -38,12 +38,14 @@ const assessmentSchema = z.object({
   isRequired: z.boolean().default(false),
   passingPercentage: z.coerce.number().min(0).max(100).default(70),
   maxAttempts: z.coerce.number().min(1).default(3),
-  mode: z.enum(["random", "manual"]).default("random"),
+  timeLimit: z.coerce.number().min(1).nullable().optional(), // Time limit in minutes
+  mode: z.enum(["random", "manual", "linked_template"]).default("random"),
   questionCount: z.coerce.number().min(1).default(10),
   randomizeQuestions: z.boolean().default(false),
   status: z.enum(["draft", "published"]).default("draft"),
   orderIndex: z.coerce.number().default(0),
   questionIds: z.array(z.string()).optional(), // For manual mode
+  testTemplateId: z.string().nullable().optional(), // For linked_template mode
 });
 
 type TopicForm = z.infer<typeof topicSchema>;
@@ -101,6 +103,17 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
       return response.json();
     },
     enabled: !!selectedTopicForAssessments,
+  });
+
+  // Fetch all test templates for linking
+  const { data: testTemplates } = useQuery({
+    queryKey: ["/api/admin/test-templates"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/test-templates");
+      if (!response.ok) throw new Error("Failed to fetch test templates");
+      return response.json();
+    },
+    enabled: open,
   });
 
   // AJAX search function for questions
@@ -1069,6 +1082,28 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                 />
                 <FormField
                   control={assessmentForm.control}
+                  name="timeLimit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Time Limit (minutes)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          placeholder="No limit"
+                          data-testid="input-time-limit" 
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              {assessmentForm.watch("mode") === "random" && (
+                <FormField
+                  control={assessmentForm.control}
                   name="questionCount"
                   render={({ field }) => (
                     <FormItem>
@@ -1080,7 +1115,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                     </FormItem>
                   )}
                 />
-              </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={assessmentForm.control}
@@ -1105,6 +1140,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                         >
                           <option value="random">Random (from question bank)</option>
                           <option value="manual">Manual (select specific questions)</option>
+                          <option value="linked_template">Linked Test Template</option>
                         </select>
                       </FormControl>
                       <FormMessage />
@@ -1132,6 +1168,33 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                   )}
                 />
               </div>
+              {assessmentForm.watch("mode") === "linked_template" && (
+                <FormField
+                  control={assessmentForm.control}
+                  name="testTemplateId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Test Template</FormLabel>
+                      <FormControl>
+                        <select
+                          className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                          data-testid="select-test-template"
+                          {...field}
+                          value={field.value || ""}
+                        >
+                          <option value="">Select a test template...</option>
+                          {testTemplates?.map((template: any) => (
+                            <option key={template.id} value={template.id}>
+                              {template.name} ({template.mode} - {template.passingPercentage}% passing)
+                            </option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               </form>
             </Form>
 

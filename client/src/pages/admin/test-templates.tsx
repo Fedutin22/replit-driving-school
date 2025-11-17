@@ -22,7 +22,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 const testTemplateSchema = z.object({
   name: z.string().min(1, "Template name is required"),
   description: z.string().optional(),
-  mode: z.enum(["random", "manual"]),
+  mode: z.enum(["random", "manual", "linked_template"]),
   questionCount: z.string().optional(),
   randomizeQuestions: z.boolean().default(false),
   passingPercentage: z.string().min(1, "Passing percentage is required"),
