@@ -275,6 +275,12 @@ export class DatabaseStorage implements IStorage {
         if (publishedOnly) {
           const assessmentsWithQuestions = await Promise.all(
             assessments.map(async (assessment) => {
+              // For linked template assessments, check if the template has questions
+              if (assessment.mode === 'linked_template' && assessment.testTemplateId) {
+                const templateQuestions = await this.getTestQuestions(assessment.testTemplateId);
+                return { assessment, hasQuestions: templateQuestions.length > 0 };
+              }
+              // For other modes, check assessment's own questions
               const questions = await this.getAssessmentQuestions(assessment.id);
               return { assessment, hasQuestions: questions.length > 0 };
             })

@@ -38,7 +38,10 @@ const assessmentSchema = z.object({
   isRequired: z.boolean().default(false),
   passingPercentage: z.coerce.number().min(0).max(100).default(70),
   maxAttempts: z.coerce.number().min(1).default(3),
-  timeLimit: z.coerce.number().min(1).nullable().optional(), // Time limit in minutes
+  timeLimit: z.union([
+    z.string().length(0), // Empty string is allowed (no time limit)
+    z.string().regex(/^[1-9]\d*$/, "Time limit must be at least 1 minute"),
+  ]).optional(), // Time limit in minutes (empty = no limit)
   mode: z.enum(["random", "manual", "linked_template"]).default("random"),
   questionCount: z.coerce.number().min(1).default(10),
   randomizeQuestions: z.boolean().default(false),
@@ -405,10 +408,19 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
   const createOrUpdateAssessmentMutation = useMutation({
     mutationFn: async (data: AssessmentForm) => {
       if (!selectedTopicForAssessments) throw new Error("No topic selected");
+      
+      // Convert timeLimit string to number or null
+      const payload = {
+        ...data,
+        timeLimit: data.timeLimit && data.timeLimit.trim() !== "" 
+          ? parseInt(data.timeLimit, 10) 
+          : null,
+      };
+      
       if (editingAssessment) {
-        await apiRequest("PATCH", `/api/admin/assessments/${editingAssessment.id}`, data);
+        await apiRequest("PATCH", `/api/admin/assessments/${editingAssessment.id}`, payload);
       } else {
-        await apiRequest("POST", `/api/admin/topics/${selectedTopicForAssessments.id}/assessments`, data);
+        await apiRequest("POST", `/api/admin/topics/${selectedTopicForAssessments.id}/assessments`, payload);
       }
     },
     onSuccess: () => {
@@ -474,11 +486,14 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
         isRequired: assessment.isRequired,
         passingPercentage: assessment.passingPercentage,
         maxAttempts: assessment.maxAttempts || 3,
+        timeLimit: assessment.timeLimit ? String(assessment.timeLimit) : "",
         mode: assessment.mode,
         questionCount: assessment.questionCount || 10,
         randomizeQuestions: assessment.randomizeQuestions,
         orderIndex: assessment.orderIndex,
         questionIds: questionIds,
+        testTemplateId: assessment.testTemplateId || "",
+        status: assessment.status,
       });
     } else {
       setEditingAssessment(null);
