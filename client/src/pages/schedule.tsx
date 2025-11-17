@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar as CalendarIcon, Clock, MapPin, Users, BookOpen, User as UserIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar as CalendarIcon, Clock, MapPin, Users, BookOpen, User as UserIcon, ChevronLeft, ChevronRight, Filter } from "lucide-react";
 import type { Schedule, Course, Topic, User } from "@shared/schema";
 import { format, startOfWeek, addDays, isSameDay, parseISO } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -26,9 +27,15 @@ export default function SchedulePage() {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => 
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
+  const [selectedInstructor, setSelectedInstructor] = useState<string>("all");
 
   const { data: schedules, isLoading } = useQuery<ScheduleWithDetails[]>({
     queryKey: ["/api/schedules"],
+  });
+
+  const { data: instructors } = useQuery<User[]>({
+    queryKey: ["/api/admin/users"],
+    enabled: user?.role === "admin" || user?.role === "instructor",
   });
 
   useEffect(() => {
@@ -108,14 +115,23 @@ export default function SchedulePage() {
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
 
+  // Filter schedules by selected instructor
+  const filteredSchedules = schedules?.filter((schedule) => {
+    if (selectedInstructor === "all") return true;
+    return schedule.instructorId === selectedInstructor;
+  });
+
   const getSchedulesForDay = (date: Date) => {
-    if (!schedules) return [];
-    return schedules.filter((schedule) =>
+    if (!filteredSchedules) return [];
+    return filteredSchedules.filter((schedule) =>
       isSameDay(parseISO(schedule.startTime.toString()), date)
     ).sort((a, b) => 
       new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     );
   };
+
+  // Get unique instructors from schedules
+  const instructorsList = instructors?.filter((u) => u.role === "instructor") || [];
 
   const previousWeek = () => {
     setCurrentWeekStart(addDays(currentWeekStart, -7));
@@ -143,7 +159,27 @@ export default function SchedulePage() {
             {isStudent ? "View your enrolled course sessions" : "View all scheduled sessions"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {!isStudent && instructorsList.length > 0 && (
+            <Select value={selectedInstructor} onValueChange={setSelectedInstructor}>
+              <SelectTrigger className="w-[200px]" data-testid="select-instructor-filter">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="All Instructors" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" data-testid="option-all-instructors">All Instructors</SelectItem>
+                {instructorsList.map((instructor) => (
+                  <SelectItem 
+                    key={instructor.id} 
+                    value={instructor.id}
+                    data-testid={`option-instructor-${instructor.id}`}
+                  >
+                    {instructor.firstName} {instructor.lastName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button variant="outline" onClick={previousWeek} data-testid="button-previous-week">
             <ChevronLeft className="h-4 w-4" />
           </Button>
