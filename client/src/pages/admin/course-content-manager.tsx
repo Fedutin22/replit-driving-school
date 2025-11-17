@@ -888,16 +888,17 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type</FormLabel>
-                    <FormControl>
-                      <select
-                        className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                        data-testid="select-topic-type"
-                        {...field}
-                      >
-                        <option value="theory">Theory</option>
-                        <option value="practice">Practice</option>
-                      </select>
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-topic-type">
+                          <SelectValue placeholder="Select topic type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="theory">Theory</SelectItem>
+                        <SelectItem value="practice">Practice</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -1138,26 +1139,29 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Mode</FormLabel>
-                      <FormControl>
-                        <select
-                          className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                          data-testid="select-assessment-mode"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            // Clear searched questions when switching modes
-                            if (e.target.value !== "manual") {
-                              setSearchedQuestions([]);
-                              setQuestionSearchTerm("");
-                              setQuestionTagFilter("all");
-                            }
-                          }}
-                        >
-                          <option value="random">Random (from question bank)</option>
-                          <option value="manual">Manual (select specific questions)</option>
-                          <option value="linked_template">Linked Test Template</option>
-                        </select>
-                      </FormControl>
+                      <Select 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          // Clear searched questions when switching modes
+                          if (value !== "manual") {
+                            setSearchedQuestions([]);
+                            setQuestionSearchTerm("");
+                            setQuestionTagFilter("all");
+                          }
+                        }} 
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-assessment-mode">
+                            <SelectValue placeholder="Select mode" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="random">Random (from question bank)</SelectItem>
+                          <SelectItem value="manual">Manual (select specific questions)</SelectItem>
+                          <SelectItem value="linked_template">Linked Test Template</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1168,16 +1172,17 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Status</FormLabel>
-                      <FormControl>
-                        <select
-                          className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                          data-testid="select-assessment-status"
-                          {...field}
-                        >
-                          <option value="draft">Draft (not visible to students)</option>
-                          <option value="published">Published (visible to students)</option>
-                        </select>
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-assessment-status">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="draft">Draft (not visible to students)</SelectItem>
+                          <SelectItem value="published">Published (visible to students)</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -1190,21 +1195,20 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Test Template</FormLabel>
-                      <FormControl>
-                        <select
-                          className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
-                          data-testid="select-test-template"
-                          {...field}
-                          value={field.value || ""}
-                        >
-                          <option value="">Select a test template...</option>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-test-template">
+                            <SelectValue placeholder="Select a test template..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
                           {testTemplates?.map((template: any) => (
-                            <option key={template.id} value={template.id}>
+                            <SelectItem key={template.id} value={template.id}>
                               {template.name} ({template.mode} - {template.passingPercentage}% passing)
-                            </option>
+                            </SelectItem>
                           ))}
-                        </select>
-                      </FormControl>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
