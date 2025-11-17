@@ -390,6 +390,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Topic assessment routes (student-facing)
+  app.get('/api/assessments/:assessmentId/attempts', isAuthenticated, async (req: any, res) => {
+    try {
+      const { assessmentId } = req.params;
+      const userId = req.user.claims.sub;
+
+      const assessment = await storage.getTopicAssessment(assessmentId);
+      if (!assessment) {
+        return res.status(404).json({ message: "Assessment not found" });
+      }
+
+      const attemptCount = await storage.getAssessmentAttemptCount(assessmentId, userId);
+      const maxAttempts = assessment.maxAttempts || 3;
+      const remainingAttempts = Math.max(0, maxAttempts - attemptCount);
+
+      res.json({
+        attemptCount,
+        maxAttempts,
+        remainingAttempts,
+        canTake: remainingAttempts > 0,
+      });
+    } catch (error) {
+      console.error("Error fetching attempt info:", error);
+      res.status(500).json({ message: "Failed to fetch attempt info" });
+    }
+  });
+
   app.post('/api/assessments/:assessmentId/start', isAuthenticated, async (req: any, res) => {
     try {
       const { assessmentId } = req.params;
@@ -415,7 +441,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error: any) {
       console.error("Error starting assessment:", error);
-      res.status(500).json({ message: error.message });
+      if (error.message && error.message.includes('Maximum attempts')) {
+        return res.status(403).json({ message: error.message });
+      }
+      res.status(500).json({ message: error.message || "Failed to start assessment" });
     }
   });
 
@@ -1183,6 +1212,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting schedule:", error);
       res.status(500).json({ message: "Failed to delete schedule" });
+    }
+  });
+
+  // Attendance routes (instructor/admin)
+  app.get('/api/instructor/schedules/:scheduleId/attendance', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { scheduleId } = req.params;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      // Verify instructor owns this schedule (admins can access all)
+      if (user?.role === 'instructor') {
+        const schedule = await storage.getSchedule(scheduleId);
+        if (!schedule || schedule.instructorId !== userId) {
+          return res.status(403).json({ message: "Not authorized to access this schedule" });
+        }
+      }
+
+      const studentsWithAttendance = await storage.getStudentsWithAttendance(scheduleId);
+      res.json(studentsWithAttendance);
+    } catch (error) {
+      console.error("Error fetching attendance:", error);
+      res.status(500).json({ message: "Failed to fetch attendance" });
+    }
+  });
+
+  app.post('/api/instructor/schedules/:scheduleId/attendance', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { scheduleId } = req.params;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      // Verify instructor owns this schedule (admins can access all)
+      if (user?.role === 'instructor') {
+        const schedule = await storage.getSchedule(scheduleId);
+        if (!schedule || schedule.instructorId !== userId) {
+          return res.status(403).json({ message: "Not authorized to access this schedule" });
+        }
+      }
+
+      // Validate request body
+      const attendanceSchema = z.object({
+        studentId: z.string().min(1),
+        status: z.enum(['present', 'absent']),
+      });
+
+      const validationResult = attendanceSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ message: "Invalid attendance data", errors: validationResult.error.errors });
+      }
+
+      const { studentId, status } = validationResult.data;
+      
+      // Verify student is registered for this session
+      const isRegistered = await storage.isStudentRegistered(scheduleId, studentId);
+      if (!isRegistered) {
+        return res.status(400).json({ message: "Student is not registered for this session" });
+      }
+
+      await storage.markAttendance(scheduleId, studentId, status, userId);
+      res.json({ message: "Attendance marked successfully" });
+    } catch (error) {
+      console.error("Error marking attendance:", error);
+      res.status(500).json({ message: "Failed to mark attendance" });
     }
   });
 

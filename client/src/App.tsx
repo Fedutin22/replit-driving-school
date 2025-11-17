@@ -20,6 +20,7 @@ import SchedulePage from "@/pages/schedule";
 import Payments from "@/pages/payments";
 import Certificates from "@/pages/certificates";
 import Questions from "@/pages/questions";
+import InstructorAttendance from "@/pages/instructor/attendance";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
 import AdminEnrollments from "@/pages/admin/enrollments";
@@ -72,6 +73,7 @@ function Router() {
           <Route path="/admin/questions" component={AdminQuestions} />
           <Route path="/admin/schedule" component={SchedulePage} />
           <Route path="/instructor/schedule" component={SchedulePage} />
+          <Route path="/instructor/attendance" component={InstructorAttendance} />
         </>
       )}
       <Route component={NotFound} />

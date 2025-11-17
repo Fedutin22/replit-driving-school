@@ -147,6 +147,7 @@ export const topicAssessments = pgTable("topic_assessments", {
   questionCount: integer("question_count"), // For random mode
   randomizeQuestions: boolean("randomize_questions").notNull().default(false),
   passingPercentage: integer("passing_percentage").notNull().default(70),
+  maxAttempts: integer("max_attempts").notNull().default(3), // Maximum number of attempts allowed
   isRequired: boolean("is_required").notNull().default(false), // Required for course completion
   status: assessmentStatusEnum("status").notNull().default("draft"), // Draft or published
   orderIndex: integer("order_index").notNull().default(0), // Position within topic content

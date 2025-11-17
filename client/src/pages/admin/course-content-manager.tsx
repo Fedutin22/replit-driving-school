@@ -37,6 +37,7 @@ const assessmentSchema = z.object({
   description: z.string().optional(),
   isRequired: z.boolean().default(false),
   passingPercentage: z.coerce.number().min(0).max(100).default(70),
+  maxAttempts: z.coerce.number().min(1).default(3),
   mode: z.enum(["random", "manual"]).default("random"),
   questionCount: z.coerce.number().min(1).default(10),
   randomizeQuestions: z.boolean().default(false),
@@ -160,6 +161,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
       description: "",
       isRequired: false,
       passingPercentage: 70,
+      maxAttempts: 3,
       mode: "random",
       questionCount: 10,
       randomizeQuestions: false,
@@ -458,6 +460,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
         description: assessment.description || "",
         isRequired: assessment.isRequired,
         passingPercentage: assessment.passingPercentage,
+        maxAttempts: assessment.maxAttempts || 3,
         mode: assessment.mode,
         questionCount: assessment.questionCount || 10,
         randomizeQuestions: assessment.randomizeQuestions,
@@ -474,6 +477,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
         description: "",
         isRequired: false,
         passingPercentage: 70,
+        maxAttempts: 3,
         mode: "random",
         questionCount: 10,
         randomizeQuestions: false,
@@ -775,7 +779,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                                   <p className="text-sm text-muted-foreground mt-1">{assessment.description}</p>
                                 )}
                                 <p className="text-xs text-muted-foreground mt-2">
-                                  Mode: {assessment.mode} | Passing: {assessment.passingPercentage}% | Questions: {assessment.questionCount || 10}
+                                  Mode: {assessment.mode} | Passing: {assessment.passingPercentage}% | Max Attempts: {assessment.maxAttempts || 3} | Questions: {assessment.questionCount || 10}
                                 </p>
                               </div>
                               <div className="flex gap-2">
@@ -1036,7 +1040,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                   )}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={assessmentForm.control}
                   name="passingPercentage"
@@ -1045,6 +1049,19 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
                       <FormLabel>Passing Percentage</FormLabel>
                       <FormControl>
                         <Input type="number" min="0" max="100" data-testid="input-passing-percentage" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={assessmentForm.control}
+                  name="maxAttempts"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max Attempts</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" data-testid="input-max-attempts" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

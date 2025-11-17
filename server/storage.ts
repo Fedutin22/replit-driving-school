@@ -39,6 +39,7 @@ import {
   type TopicAssessmentQuestion,
   type InsertSchedule,
   type Schedule,
+  type Attendance,
   type InsertPayment,
   type Payment,
   type InsertCertificate,
@@ -114,6 +115,7 @@ export interface IStorage {
   getTestInstance(id: string): Promise<TestInstance | undefined>;
   updateTestInstance(id: string, data: Partial<TestInstance>): Promise<TestInstance>;
   getTestInstancesByStudent(studentId: string): Promise<TestInstance[]>;
+  getAssessmentAttemptCount(assessmentId: string, studentId: string): Promise<number>;
   startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>; // Legacy
   startAssessment(assessmentId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>;
   submitTest(testInstanceId: string, answers: Record<string, any>): Promise<TestInstance>;
@@ -138,6 +140,11 @@ export interface IStorage {
   unregisterFromSession(scheduleId: string, studentId: string): Promise<void>;
   getSessionRegistrationCount(scheduleId: string): Promise<number>;
   isStudentRegistered(scheduleId: string, studentId: string): Promise<boolean>;
+  
+  // Attendance operations
+  markAttendance(scheduleId: string, studentId: string, status: 'present' | 'absent', markedBy: string): Promise<void>;
+  getSessionAttendance(scheduleId: string): Promise<Array<Attendance & { student: User }>>;
+  getStudentsWithAttendance(scheduleId: string): Promise<Array<{ studentId: string; student: User; status: 'present' | 'absent' | null; markedAt: Date | null }>>;
   
   // Payment operations
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -857,6 +864,19 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(testInstances.createdAt));
   }
 
+  async getAssessmentAttemptCount(assessmentId: string, studentId: string): Promise<number> {
+    const attempts = await db
+      .select()
+      .from(testInstances)
+      .where(
+        and(
+          eq(testInstances.topicAssessmentId, assessmentId),
+          eq(testInstances.studentId, studentId)
+        )
+      );
+    return attempts.length;
+  }
+
   async startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }> {
     const template = await this.getTestTemplate(testTemplateId);
     if (!template) {
@@ -928,6 +948,12 @@ export class DatabaseStorage implements IStorage {
     const assessment = await this.getTopicAssessment(assessmentId);
     if (!assessment) {
       throw new Error('Topic assessment not found');
+    }
+
+    // Check if student has exceeded max attempts
+    const attemptCount = await this.getAssessmentAttemptCount(assessmentId, studentId);
+    if (attemptCount >= (assessment.maxAttempts || 3)) {
+      throw new Error(`Maximum attempts (${assessment.maxAttempts || 3}) exceeded for this assessment`);
     }
 
     let questionsToServe: any[] = [];
@@ -1292,6 +1318,82 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return !!registration;
+  }
+
+  // Attendance operations
+  async markAttendance(scheduleId: string, studentId: string, status: 'present' | 'absent', markedBy: string): Promise<void> {
+    // Check if attendance already exists
+    const [existing] = await db
+      .select()
+      .from(attendance)
+      .where(
+        and(
+          eq(attendance.scheduleId, scheduleId),
+          eq(attendance.studentId, studentId)
+        )
+      );
+
+    if (existing) {
+      // Update existing attendance
+      await db
+        .update(attendance)
+        .set({ status, markedBy, markedAt: new Date() })
+        .where(
+          and(
+            eq(attendance.scheduleId, scheduleId),
+            eq(attendance.studentId, studentId)
+          )
+        );
+    } else {
+      // Create new attendance record
+      await db.insert(attendance).values({
+        scheduleId,
+        studentId,
+        status,
+        markedBy,
+      });
+    }
+  }
+
+  async getSessionAttendance(scheduleId: string): Promise<Array<Attendance & { student: User }>> {
+    const attendanceRecords = await db
+      .select()
+      .from(attendance)
+      .leftJoin(users, eq(attendance.studentId, users.id))
+      .where(eq(attendance.scheduleId, scheduleId));
+
+    return attendanceRecords.map(record => ({
+      ...record.attendance,
+      student: record.users!,
+    }));
+  }
+
+  async getStudentsWithAttendance(scheduleId: string): Promise<Array<{ studentId: string; student: User; status: 'present' | 'absent' | null; markedAt: Date | null }>> {
+    // Get registered students (filter for students only)
+    const registrations = await db
+      .select()
+      .from(sessionRegistrations)
+      .leftJoin(users, eq(sessionRegistrations.studentId, users.id))
+      .where(eq(sessionRegistrations.scheduleId, scheduleId));
+
+    // Get attendance records
+    const attendanceRecords = await db
+      .select()
+      .from(attendance)
+      .where(eq(attendance.scheduleId, scheduleId));
+
+    // Combine data, filtering for students only
+    return registrations
+      .filter(reg => reg.users?.role === 'student')
+      .map(reg => {
+        const attendanceRecord = attendanceRecords.find(a => a.studentId === reg.session_registrations.studentId);
+        return {
+          studentId: reg.session_registrations.studentId,
+          student: reg.users!,
+          status: attendanceRecord?.status || null,
+          markedAt: attendanceRecord?.markedAt || null,
+        };
+      });
   }
 
   // Payment operations
