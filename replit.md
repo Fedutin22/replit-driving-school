@@ -24,7 +24,7 @@ The backend is built with Express.js and TypeScript, featuring a dual authentica
 *   **Course Management Statistics:** The admin course management table displays comprehensive statistics for each course, including topic, post, and schedule counts, optimized with efficient database queries.
 *   **Student Course Schedule Count:** Students can view the number of scheduled sessions for both enrolled and available courses.
 *   **Enrollment Tracking:** Admin-only features for student enrollment overview and progress tracking, with detailed enrollment data and search functionality.
-*   **Assessment Attempt Limits:** Configurable maximum attempts for topic assessments (defaulting to 3), enforced before assessment creation, with API endpoints providing attempt statistics.
+*   **Assessment Attempt Limits:** Configurable maximum attempts for both topic assessments and test templates (defaulting to 3). Attempt limits are enforced server-side before allowing students to start assessments/tests, with dedicated API endpoints providing attempt statistics. All attempts (started and completed) count toward the limit.
 *   **Attendance Tracking:** Instructors and admins can manage attendance for scheduled sessions. The UI provides session selection and student lists, allowing marking of present/absent status. Security ensures instructors can only access their assigned sessions.
 *   **Account Unification:** The system unifies user accounts when a user logs in via OIDC with an email matching an existing local auth user, preserving user data and roles across authentication methods.
 
