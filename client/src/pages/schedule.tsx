@@ -236,7 +236,7 @@ export default function SchedulePage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <div className="min-w-[800px]">
+              <div className="min-w-[1400px]">
                 {/* Header with day names */}
                 <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b sticky top-0 bg-background z-10">
                   <div className="p-3 border-r bg-muted/30"></div>
