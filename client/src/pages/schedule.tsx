@@ -318,7 +318,9 @@ export default function SchedulePage() {
                                           </h4>
                                           <p className="text-xs text-muted-foreground truncate" title={schedule.course.name}>
                                             <BookOpen className="h-3 w-3 inline mr-1" />
-                                            {schedule.course.name}
+                                            {schedule.course.name.length > 30 
+                                              ? schedule.course.name.substring(0, 30) + '...' 
+                                              : schedule.course.name}
                                           </p>
                                         </div>
                                         {schedule.isRegistered && (
