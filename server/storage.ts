@@ -218,7 +218,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(courses).orderBy(desc(courses.createdAt));
   }
 
-  async getCoursesWithScheduleCount(): Promise<Array<Course & { scheduleCount: number; topicCount: number; postCount: number }>> {
+  async getCoursesWithScheduleCount(): Promise<Array<Course & { scheduleCount: number; topicCount: number; postCount: number; studentCount: number; passedCount: number; instructorIds: string[] }>> {
     const result = await db
       .select({
         course: courses,
@@ -233,12 +233,38 @@ export class DatabaseStorage implements IStorage {
       .groupBy(courses.id)
       .orderBy(desc(courses.createdAt));
     
-    return result.map(row => ({
-      ...row.course,
-      scheduleCount: row.scheduleCount,
-      topicCount: row.topicCount,
-      postCount: row.postCount,
-    }));
+    const coursesWithCounts = await Promise.all(
+      result.map(async (row) => {
+        // Get enrollment counts
+        const enrollments = await db
+          .select()
+          .from(courseEnrollments)
+          .where(eq(courseEnrollments.courseId, row.course.id));
+        
+        const studentCount = enrollments.filter(e => e.isActive).length;
+        const passedCount = enrollments.filter(e => e.completedAt !== null).length;
+        
+        // Get unique instructor IDs from schedules
+        const courseSchedules = await db
+          .select({ instructorId: schedules.instructorId })
+          .from(schedules)
+          .where(eq(schedules.courseId, row.course.id));
+        
+        const instructorIds = Array.from(new Set(courseSchedules.map(s => s.instructorId)));
+        
+        return {
+          ...row.course,
+          scheduleCount: row.scheduleCount,
+          topicCount: row.topicCount,
+          postCount: row.postCount,
+          studentCount,
+          passedCount,
+          instructorIds,
+        };
+      })
+    );
+    
+    return coursesWithCounts;
   }
 
   async getCourse(id: string): Promise<Course | undefined> {
