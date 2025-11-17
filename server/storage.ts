@@ -1068,7 +1068,9 @@ export class DatabaseStorage implements IStorage {
       const now = new Date();
       const elapsedMinutes = (now.getTime() - startedAt.getTime()) / (1000 * 60);
       
-      if (elapsedMinutes > timeLimit) {
+      // Allow a 5-second grace period to account for network latency
+      const gracePeriodMinutes = 5 / 60; // 5 seconds in minutes
+      if (elapsedMinutes > (timeLimit + gracePeriodMinutes)) {
         throw new Error(`Test submission rejected: Time limit of ${timeLimit} minutes has been exceeded`);
       }
     }
