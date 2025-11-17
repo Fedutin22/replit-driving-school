@@ -176,6 +176,10 @@ export default function SchedulePage() {
   const { minHour, maxHour } = getTimeRange();
   const timeSlots = Array.from({ length: maxHour - minHour + 1 }, (_, i) => i + minHour);
 
+  // Check if there are any schedules in the current week
+  const hasSchedulesInWeek = weekDays.some(day => getSchedulesForDay(day).length > 0);
+  const calendarWidth = hasSchedulesInWeek ? 'min-w-[2400px]' : 'min-w-[1200px]';
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -236,7 +240,7 @@ export default function SchedulePage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <div className="min-w-[2400px]">
+              <div className={calendarWidth}>
                 {/* Header with day names */}
                 <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b sticky top-0 bg-background z-10">
                   <div className="p-3 border-r bg-muted/30"></div>
@@ -264,10 +268,12 @@ export default function SchedulePage() {
                 <div className="grid grid-cols-[80px_repeat(7,1fr)]">
                   {/* Time labels column */}
                   <div className="border-r bg-muted/30">
-                    {timeSlots.map((hour) => (
+                    {timeSlots.map((hour, index) => (
                       <div 
                         key={hour} 
-                        className="h-16 flex items-start justify-end pr-3 pt-1 text-xs text-muted-foreground font-medium border-b"
+                        className={`h-16 flex items-start justify-end pr-3 pt-1 text-xs text-muted-foreground font-medium ${
+                          index % 2 === 0 ? 'border-b-2' : 'border-b'
+                        }`}
                       >
                         {hour}:00
                       </div>
@@ -286,7 +292,7 @@ export default function SchedulePage() {
                           isToday ? "bg-primary/[0.02]" : ""
                         }`}
                       >
-                        {timeSlots.map((hour) => {
+                        {timeSlots.map((hour, hourIndex) => {
                           // Find schedules that fall in this hour
                           const hourSchedules = daySchedules.filter(schedule => {
                             const start = new Date(schedule.startTime);
@@ -297,7 +303,9 @@ export default function SchedulePage() {
                           return (
                             <div
                               key={hour}
-                              className="h-16 border-b p-1 space-y-1"
+                              className={`h-16 p-1 space-y-1 ${
+                                hourIndex % 2 === 0 ? 'border-b-2' : 'border-b'
+                              }`}
                               data-testid={`time-slot-${hour}-${dayIndex}`}
                             >
                               {hourSchedules.map((schedule) => {
