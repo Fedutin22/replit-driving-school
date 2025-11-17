@@ -105,12 +105,14 @@ Preferred communication style: Simple, everyday language.
 - **Schedule Calendar Feature:**
   - Weekly calendar view accessible via `/schedule` (students), `/instructor/schedule` (instructors), `/admin/schedule` (admins)
   - Role-based filtering: Students see only schedules for enrolled courses; instructors/admins see all schedules
-  - Interactive calendar with 7-day weekly grid (Monday-Sunday), navigation buttons (Previous Week, Today, Next Week)
-  - Schedule cards display: session title, course name, start/end time, instructor name, location, capacity/registration count
+  - Instructor filter: Dropdown to filter sessions by instructor (accessible to both admin and instructor roles via `/api/instructors` endpoint)
+  - Interactive calendar with vertical time axis layout (8:00-22:00 by default, dynamically adjusts to show all sessions)
+  - Simple vertical stacking: Events display in their start hour time slot, stacked with spacing (no complex collision detection)
+  - Navigation: Previous Week, Today, Next Week buttons; current day highlighted with primary color
+  - Schedule cards display: session title, course name (truncated to 30 characters with full name on hover), start/end time, instructor name, location, capacity/registration count
   - Student registration: Students can register/unregister for upcoming sessions directly from calendar
   - Capacity enforcement: Backend validates capacity limits and prevents duplicate registrations via `registerForSession`
   - Real-time status indicators: "Registered" badge for enrolled sessions, "Full" badge for at-capacity sessions
-  - Current day highlighting with primary color for easy orientation
 
 **Enrollment Tracking:**
 - Admin-only enrollment overview and student progress tracking
