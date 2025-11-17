@@ -173,6 +173,7 @@ export const testTemplates = pgTable("test_templates", {
   questionCount: integer("question_count"), // For random mode
   randomizeQuestions: boolean("randomize_questions").notNull().default(false), // Randomize question order
   passingPercentage: integer("passing_percentage").notNull().default(70),
+  maxAttempts: integer("max_attempts").notNull().default(3), // Maximum number of attempts allowed
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

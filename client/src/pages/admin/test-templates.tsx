@@ -26,6 +26,7 @@ const testTemplateSchema = z.object({
   questionCount: z.string().optional(),
   randomizeQuestions: z.boolean().default(false),
   passingPercentage: z.string().min(1, "Passing percentage is required"),
+  maxAttempts: z.string().min(1, "Max attempts is required"),
 });
 
 type TestTemplateForm = z.infer<typeof testTemplateSchema>;
@@ -83,6 +84,7 @@ export default function AdminTestTemplates() {
       questionCount: "10",
       randomizeQuestions: false,
       passingPercentage: "70",
+      maxAttempts: "3",
     },
   });
 
@@ -93,6 +95,7 @@ export default function AdminTestTemplates() {
         questionCount: data.questionCount ? parseInt(data.questionCount) : null,
         randomizeQuestions: data.randomizeQuestions,
         passingPercentage: parseInt(data.passingPercentage),
+        maxAttempts: parseInt(data.maxAttempts),
       };
       
       if (editingTemplate) {
@@ -130,6 +133,7 @@ export default function AdminTestTemplates() {
         questionCount: template.questionCount?.toString() || "10",
         randomizeQuestions: template.randomizeQuestions || false,
         passingPercentage: template.passingPercentage.toString(),
+        maxAttempts: template.maxAttempts.toString(),
       });
     } else {
       setEditingTemplate(null);
@@ -140,6 +144,7 @@ export default function AdminTestTemplates() {
         questionCount: "10",
         randomizeQuestions: false,
         passingPercentage: "70",
+        maxAttempts: "3",
       });
     }
     setIsDialogOpen(true);
@@ -218,7 +223,7 @@ export default function AdminTestTemplates() {
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name="mode"
@@ -248,6 +253,19 @@ export default function AdminTestTemplates() {
                         <FormLabel>Passing %</FormLabel>
                         <FormControl>
                           <Input data-testid="input-passing-percentage" type="number" min="0" max="100" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="maxAttempts"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Max Attempts</FormLabel>
+                        <FormControl>
+                          <Input data-testid="input-max-attempts" type="number" min="1" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

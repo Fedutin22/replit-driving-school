@@ -198,6 +198,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get test attempt information
+  app.get('/api/tests/:testId/attempts', isAuthenticated, async (req: any, res) => {
+    try {
+      const { testId } = req.params;
+      const userId = req.user.claims.sub;
+
+      const template = await storage.getTestTemplate(testId);
+      if (!template) {
+        return res.status(404).json({ message: "Test template not found" });
+      }
+
+      const attemptCount = await storage.getTestAttemptCount(testId, userId);
+      const maxAttempts = template.maxAttempts || 3;
+      const remainingAttempts = Math.max(0, maxAttempts - attemptCount);
+
+      res.json({
+        attemptCount,
+        maxAttempts,
+        remainingAttempts,
+        canTake: remainingAttempts > 0,
+      });
+    } catch (error) {
+      console.error("Error fetching attempt info:", error);
+      res.status(500).json({ message: "Failed to fetch attempt info" });
+    }
+  });
+
   // Start a test
   app.post('/api/tests/:testId/start', isAuthenticated, async (req: any, res) => {
     try {
@@ -210,8 +237,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await storage.startTest(testId, userId);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error starting test:", error);
+      if (error.message && error.message.includes('Maximum attempts')) {
+        return res.status(403).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to start test" });
     }
   });

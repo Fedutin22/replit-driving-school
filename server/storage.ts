@@ -116,6 +116,7 @@ export interface IStorage {
   updateTestInstance(id: string, data: Partial<TestInstance>): Promise<TestInstance>;
   getTestInstancesByStudent(studentId: string): Promise<TestInstance[]>;
   getAssessmentAttemptCount(assessmentId: string, studentId: string): Promise<number>;
+  getTestAttemptCount(testTemplateId: string, studentId: string): Promise<number>;
   startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>; // Legacy
   startAssessment(assessmentId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>;
   submitTest(testInstanceId: string, answers: Record<string, any>): Promise<TestInstance>;
@@ -877,10 +878,29 @@ export class DatabaseStorage implements IStorage {
     return attempts.length;
   }
 
+  async getTestAttemptCount(testTemplateId: string, studentId: string): Promise<number> {
+    const attempts = await db
+      .select()
+      .from(testInstances)
+      .where(
+        and(
+          eq(testInstances.testTemplateId, testTemplateId),
+          eq(testInstances.studentId, studentId)
+        )
+      );
+    return attempts.length;
+  }
+
   async startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }> {
     const template = await this.getTestTemplate(testTemplateId);
     if (!template) {
       throw new Error('Test template not found');
+    }
+
+    // Check if student has exceeded max attempts
+    const attemptCount = await this.getTestAttemptCount(testTemplateId, studentId);
+    if (attemptCount >= (template.maxAttempts || 3)) {
+      throw new Error(`Maximum attempts (${template.maxAttempts || 3}) exceeded for this test`);
     }
 
     let questionsToServe: any[] = [];
