@@ -995,6 +995,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/courses/:courseId/enrolled-students', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const { courseId } = req.params;
+      const enrolledStudents = await storage.getEnrolledStudentsWithProgress(courseId);
+      res.json(enrolledStudents);
+    } catch (error) {
+      console.error("Error fetching enrolled students:", error);
+      res.status(500).json({ message: "Failed to fetch enrolled students" });
+    }
+  });
+
   app.post('/api/admin/courses', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
     try {
       const user = await storage.getUser(req.user.claims.sub);
