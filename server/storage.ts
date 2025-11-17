@@ -60,7 +60,7 @@ export interface IStorage {
   // Course operations
   getCourses(): Promise<Course[]>;
   getCourse(id: string): Promise<Course | undefined>;
-  getCourseWithContent(id: string): Promise<{ course: Course; topics: Array<Topic & { posts: Post[]; assessments: TopicAssessment[] }>; tests: TestTemplate[] } | undefined>;
+  getCourseWithContent(id: string, publishedOnly?: boolean): Promise<{ course: Course; topics: Array<Topic & { posts: Post[]; assessments: TopicAssessment[] }>; tests: TestTemplate[] } | undefined>;
   createCourse(course: InsertCourse): Promise<Course>;
   updateCourse(id: string, data: Partial<Course>): Promise<Course>;
   
