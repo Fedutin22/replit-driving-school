@@ -123,6 +123,19 @@ export interface IStorage {
   
   // Enrollment operations
   createEnrollment(enrollment: InsertCourseEnrollment): Promise<CourseEnrollment>;
+  getEnrolledStudentsWithProgress(courseId: string): Promise<Array<{
+    enrollment: CourseEnrollment;
+    student: User;
+    testProgress: Array<{
+      assessmentId: string;
+      assessmentName: string;
+      topicName: string;
+      attempts: number;
+      passed: boolean;
+      bestScore: number | null;
+      lastAttemptDate: Date | null;
+    }>;
+  }>>;
   getEnrollmentsByStudent(studentId: string): Promise<CourseEnrollment[]>;
   getEnrollment(courseId: string, studentId: string): Promise<CourseEnrollment | undefined>;
   updateEnrollment(id: string, data: Partial<CourseEnrollment>): Promise<CourseEnrollment>;
@@ -1201,6 +1214,121 @@ export class DatabaseStorage implements IStorage {
   async createEnrollment(enrollmentData: InsertCourseEnrollment): Promise<CourseEnrollment> {
     const [enrollment] = await db.insert(courseEnrollments).values(enrollmentData).returning();
     return enrollment;
+  }
+
+  async getEnrolledStudentsWithProgress(courseId: string): Promise<Array<{
+    enrollment: CourseEnrollment;
+    student: User;
+    testProgress: Array<{
+      assessmentId: string;
+      assessmentName: string;
+      topicName: string;
+      attempts: number;
+      passed: boolean;
+      bestScore: number | null;
+      lastAttemptDate: Date | null;
+    }>;
+  }>> {
+    // Get all enrollments for this course
+    const enrollments = await db
+      .select()
+      .from(courseEnrollments)
+      .where(eq(courseEnrollments.courseId, courseId))
+      .orderBy(desc(courseEnrollments.enrolledAt));
+
+    // Get all students
+    const studentIds = enrollments.map(e => e.studentId);
+    if (studentIds.length === 0) {
+      return [];
+    }
+
+    const students = await db
+      .select()
+      .from(users)
+      .where(inArray(users.id, studentIds));
+
+    const studentMap = new Map(students.map(s => [s.id, s]));
+
+    // Get all topic assessments for this course
+    const courseTopics = await db
+      .select()
+      .from(topics)
+      .where(eq(topics.courseId, courseId));
+
+    const topicIds = courseTopics.map(t => t.id);
+    const topicMap = new Map(courseTopics.map(t => [t.id, t]));
+
+    let assessments: TopicAssessment[] = [];
+    if (topicIds.length > 0) {
+      assessments = await db
+        .select()
+        .from(topicAssessments)
+        .where(inArray(topicAssessments.topicId, topicIds))
+        .orderBy(asc(topicAssessments.orderIndex));
+    }
+
+    // Get all test instances for these students and assessments
+    const assessmentIds = assessments.map(a => a.id);
+    let allTestInstances: TestInstance[] = [];
+    if (assessmentIds.length > 0 && studentIds.length > 0) {
+      allTestInstances = await db
+        .select()
+        .from(testInstances)
+        .where(
+          and(
+            inArray(testInstances.topicAssessmentId, assessmentIds),
+            inArray(testInstances.studentId, studentIds)
+          )
+        );
+    }
+
+    // Build progress for each student
+    return enrollments.map(enrollment => {
+      const student = studentMap.get(enrollment.studentId);
+      if (!student) {
+        throw new Error(`Student ${enrollment.studentId} not found`);
+      }
+
+      // Get test progress for this student
+      const studentTestInstances = allTestInstances.filter(
+        ti => ti.studentId === enrollment.studentId
+      );
+
+      // Group by assessment
+      const assessmentProgress = assessments.map(assessment => {
+        const assessmentInstances = studentTestInstances.filter(
+          ti => ti.topicAssessmentId === assessment.id
+        );
+
+        const topic = topicMap.get(assessment.topicId);
+        const completedInstances = assessmentInstances.filter(ti => ti.submittedAt !== null);
+        const passedInstances = completedInstances.filter(ti => ti.passed === true);
+        
+        const bestScore = completedInstances.length > 0
+          ? Math.max(...completedInstances.map(ti => ti.percentage || 0))
+          : null;
+
+        const lastAttempt = completedInstances.length > 0
+          ? new Date(Math.max(...completedInstances.map(ti => new Date(ti.submittedAt!).getTime())))
+          : null;
+
+        return {
+          assessmentId: assessment.id,
+          assessmentName: assessment.name,
+          topicName: topic?.name || 'Unknown',
+          attempts: assessmentInstances.length,
+          passed: passedInstances.length > 0,
+          bestScore,
+          lastAttemptDate: lastAttempt,
+        };
+      });
+
+      return {
+        enrollment,
+        student,
+        testProgress: assessmentProgress,
+      };
+    });
   }
 
   async getEnrollmentsByStudent(studentId: string): Promise<CourseEnrollment[]> {
