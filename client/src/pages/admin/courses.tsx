@@ -18,6 +18,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { CourseContentManager } from "./course-content-manager";
 import { ScheduleManager } from "./schedule-manager";
+import { EnrolledStudents } from "./enrolled-students";
 
 const courseSchema = z.object({
   name: z.string().min(1, "Course name is required"),
@@ -42,6 +43,7 @@ export default function AdminCourses() {
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [managingCourse, setManagingCourse] = useState<Course | null>(null);
   const [managingSchedules, setManagingSchedules] = useState<Course | null>(null);
+  const [viewingStudents, setViewingStudents] = useState<Course | null>(null);
   const [selectedInstructor, setSelectedInstructor] = useState<string>("all");
 
   const { data: courses, isLoading } = useQuery<CourseWithCounts[]>({
@@ -364,34 +366,46 @@ export default function AdminCourses() {
                   </div>
                 </CardContent>
 
-                <CardFooter className="flex items-center justify-between gap-2 pt-4 border-t">
+                <CardFooter className="flex flex-col gap-2 pt-4 border-t">
+                  <div className="flex items-center gap-2 w-full flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setManagingCourse(course)}
+                      data-testid={`button-manage-content-${course.id}`}
+                      className="flex-1 min-w-[100px]"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Content
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setManagingSchedules(course)}
+                      data-testid={`button-manage-schedules-${course.id}`}
+                      className="flex-1 min-w-[100px]"
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Schedule
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleOpenDialog(course)}
+                      data-testid={`button-edit-course-${course.id}`}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <Button
-                    variant="outline"
+                    variant="default"
                     size="sm"
-                    onClick={() => setManagingCourse(course)}
-                    data-testid={`button-manage-content-${course.id}`}
-                    className="flex-1"
+                    onClick={() => setViewingStudents(course)}
+                    data-testid={`button-view-students-${course.id}`}
+                    className="w-full"
                   >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Content
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setManagingSchedules(course)}
-                    data-testid={`button-manage-schedules-${course.id}`}
-                    className="flex-1"
-                  >
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Schedule
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleOpenDialog(course)}
-                    data-testid={`button-edit-course-${course.id}`}
-                  >
-                    <Edit className="h-4 w-4" />
+                    <Users className="h-4 w-4 mr-2" />
+                    View Students ({course.studentCount})
                   </Button>
                 </CardFooter>
               </Card>
@@ -413,6 +427,14 @@ export default function AdminCourses() {
           course={managingSchedules}
           open={!!managingSchedules}
           onClose={() => setManagingSchedules(null)}
+        />
+      )}
+
+      {viewingStudents && (
+        <EnrolledStudents
+          course={viewingStudents}
+          open={!!viewingStudents}
+          onClose={() => setViewingStudents(null)}
         />
       )}
     </div>

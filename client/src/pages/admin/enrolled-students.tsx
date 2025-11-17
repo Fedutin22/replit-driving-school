@@ -196,7 +196,7 @@ export function EnrolledStudents({ course, open, onClose }: EnrolledStudentsProp
                                     </p>
                                   </div>
                                   {test.passed && (
-                                    <Badge size="sm" variant="default">
+                                    <Badge variant="default">
                                       Passed
                                     </Badge>
                                   )}
