@@ -977,8 +977,47 @@ export class DatabaseStorage implements IStorage {
     }
 
     let questionsToServe: any[] = [];
+    let shouldRandomize = assessment.randomizeQuestions;
 
-    if (assessment.mode === 'manual') {
+    if (assessment.mode === 'linked_template') {
+      // Use questions from linked test template
+      if (!assessment.testTemplateId) {
+        throw new Error('Test template ID is required for linked template mode');
+      }
+
+      const template = await this.getTestTemplate(assessment.testTemplateId);
+      if (!template) {
+        throw new Error('Linked test template not found');
+      }
+
+      // Generate questions based on template's mode
+      if (template.mode === 'manual') {
+        const testQuestionsData = await this.getTestQuestions(assessment.testTemplateId);
+        questionsToServe = testQuestionsData.map(tq => ({
+          id: tq.question.id,
+          questionText: tq.question.questionText,
+          type: tq.question.type,
+          choices: tq.question.choices,
+          orderIndex: tq.orderIndex,
+        }));
+      } else if (template.mode === 'random') {
+        const allQuestions = await this.getQuestions();
+        const activeQuestions = allQuestions.filter(q => !q.isArchived);
+        
+        const shuffled = activeQuestions.sort(() => Math.random() - 0.5);
+        const count = Math.min(template.questionCount || 10, shuffled.length);
+        questionsToServe = shuffled.slice(0, count).map((q, index) => ({
+          id: q.id,
+          questionText: q.questionText,
+          type: q.type,
+          choices: q.choices,
+          orderIndex: index,
+        }));
+      }
+
+      // Use template's randomize setting
+      shouldRandomize = template.randomizeQuestions;
+    } else if (assessment.mode === 'manual') {
       // Get manually selected questions
       const assessmentQuestionsData = await this.getAssessmentQuestions(assessmentId);
       questionsToServe = assessmentQuestionsData.map(aq => ({
@@ -1005,8 +1044,8 @@ export class DatabaseStorage implements IStorage {
       }));
     }
 
-    // Randomize question order if assessment specifies
-    if (assessment.randomizeQuestions) {
+    // Randomize question order if specified
+    if (shouldRandomize) {
       questionsToServe.sort(() => Math.random() - 0.5);
       questionsToServe.forEach((q, index) => {
         q.orderIndex = index;
