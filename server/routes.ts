@@ -814,6 +814,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint for both admins and instructors to fetch instructor list
+  app.get('/api/instructors', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const instructors = users.filter(u => u.role === 'instructor');
+      res.json(instructors);
+    } catch (error) {
+      console.error("Error fetching instructors:", error);
+      res.status(500).json({ message: "Failed to fetch instructors" });
+    }
+  });
+
   app.get('/api/admin/export/students', isAuthenticated, requireRole(['admin']), async (req: any, res) => {
     try {
       const users = await storage.getAllUsers();

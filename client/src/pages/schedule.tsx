@@ -34,7 +34,7 @@ export default function SchedulePage() {
   });
 
   const { data: instructors } = useQuery<User[]>({
-    queryKey: ["/api/admin/users"],
+    queryKey: ["/api/instructors"],
     enabled: user?.role === "admin" || user?.role === "instructor",
   });
 
