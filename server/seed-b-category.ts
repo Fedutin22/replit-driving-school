@@ -2,6 +2,7 @@ import { db } from './db';
 import { users, courses, topics, schedules } from '../shared/schema';
 import { sql } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
+import { fromZonedTime } from 'date-fns-tz';
 
 async function seed() {
   console.log('Starting B-category courses database seeding...');
@@ -170,8 +171,10 @@ async function seedData() {
     
     for (let i = 0; i < schedData.dates.length; i++) {
       const date = schedData.dates[i];
-      const startDateTime = new Date(`${date}T${schedData.startTime}:00`);
-      const endDateTime = new Date(`${date}T${schedData.endTime}:00`);
+      // Create dates in Europe/Riga timezone, respecting DST (UTC+2/+3)
+      // fromZonedTime converts local Riga time to UTC, automatically handling DST
+      const startDateTime = fromZonedTime(`${date} ${schedData.startTime}`, 'Europe/Riga');
+      const endDateTime = fromZonedTime(`${date} ${schedData.endTime}`, 'Europe/Riga');
       
       await db.insert(schedules).values({
         courseId: course.id,

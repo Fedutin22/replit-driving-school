@@ -334,7 +334,7 @@ export default function SchedulePage() {
                                         <div className="flex items-center gap-1">
                                           <Clock className="h-3 w-3 shrink-0" />
                                           <span className="truncate">
-                                            {format(parseISO(schedule.startTime.toString()), "HH:mm")} - {format(parseISO(schedule.endTime.toString()), "HH:mm")}
+                                            {new Date(schedule.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Riga' })} - {new Date(schedule.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Riga' })}
                                           </span>
                                         </div>
 
