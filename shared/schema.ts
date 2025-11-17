@@ -148,6 +148,7 @@ export const topicAssessments = pgTable("topic_assessments", {
   randomizeQuestions: boolean("randomize_questions").notNull().default(false),
   passingPercentage: integer("passing_percentage").notNull().default(70),
   maxAttempts: integer("max_attempts").notNull().default(3), // Maximum number of attempts allowed
+  timeLimit: integer("time_limit"), // Time limit in minutes (null = no time limit)
   isRequired: boolean("is_required").notNull().default(false), // Required for course completion
   status: assessmentStatusEnum("status").notNull().default("draft"), // Draft or published
   orderIndex: integer("order_index").notNull().default(0), // Position within topic content
@@ -174,6 +175,7 @@ export const testTemplates = pgTable("test_templates", {
   randomizeQuestions: boolean("randomize_questions").notNull().default(false), // Randomize question order
   passingPercentage: integer("passing_percentage").notNull().default(70),
   maxAttempts: integer("max_attempts").notNull().default(3), // Maximum number of attempts allowed
+  timeLimit: integer("time_limit"), // Time limit in minutes (null = no time limit)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

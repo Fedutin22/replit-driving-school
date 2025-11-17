@@ -117,8 +117,8 @@ export interface IStorage {
   getTestInstancesByStudent(studentId: string): Promise<TestInstance[]>;
   getAssessmentAttemptCount(assessmentId: string, studentId: string): Promise<number>;
   getTestAttemptCount(testTemplateId: string, studentId: string): Promise<number>;
-  startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>; // Legacy
-  startAssessment(assessmentId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }>;
+  startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[]; timeLimit: number | null }>; // Legacy
+  startAssessment(assessmentId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[]; timeLimit: number | null }>;
   submitTest(testInstanceId: string, answers: Record<string, any>): Promise<TestInstance>;
   
   // Enrollment operations
@@ -891,7 +891,7 @@ export class DatabaseStorage implements IStorage {
     return attempts.length;
   }
 
-  async startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }> {
+  async startTest(testTemplateId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[]; timeLimit: number | null }> {
     const template = await this.getTestTemplate(testTemplateId);
     if (!template) {
       throw new Error('Test template not found');
@@ -961,10 +961,10 @@ export class DatabaseStorage implements IStorage {
       orderIndex: q.orderIndex,
     }));
 
-    return { testInstance, questions: questionsForClient };
+    return { testInstance, questions: questionsForClient, timeLimit: template.timeLimit };
   }
 
-  async startAssessment(assessmentId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[] }> {
+  async startAssessment(assessmentId: string, studentId: string): Promise<{ testInstance: TestInstance; questions: any[]; timeLimit: number | null }> {
     const assessment = await this.getTopicAssessment(assessmentId);
     if (!assessment) {
       throw new Error('Topic assessment not found');
@@ -1035,7 +1035,7 @@ export class DatabaseStorage implements IStorage {
       orderIndex: q.orderIndex,
     }));
 
-    return { testInstance, questions: questionsForClient };
+    return { testInstance, questions: questionsForClient, timeLimit: assessment.timeLimit };
   }
 
   async submitTest(testInstanceId: string, answers: Record<string, any>): Promise<TestInstance> {
@@ -1046,16 +1046,30 @@ export class DatabaseStorage implements IStorage {
 
     // Determine if this is a legacy test or topic assessment
     let passingPercentage = 70; // Default
+    let timeLimit: number | null = null;
     
     if (instance.topicAssessmentId) {
       const assessment = await this.getTopicAssessment(instance.topicAssessmentId);
       if (assessment) {
         passingPercentage = assessment.passingPercentage;
+        timeLimit = assessment.timeLimit;
       }
     } else if (instance.testTemplateId) {
       const template = await this.getTestTemplate(instance.testTemplateId);
       if (template) {
         passingPercentage = template.passingPercentage;
+        timeLimit = template.timeLimit;
+      }
+    }
+
+    // Check if submission is within time limit
+    if (timeLimit) {
+      const startedAt = new Date(instance.startedAt);
+      const now = new Date();
+      const elapsedMinutes = (now.getTime() - startedAt.getTime()) / (1000 * 60);
+      
+      if (elapsedMinutes > timeLimit) {
+        throw new Error(`Test submission rejected: Time limit of ${timeLimit} minutes has been exceeded`);
       }
     }
 

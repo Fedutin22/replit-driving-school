@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { AlertCircle, CheckCircle2, ArrowLeft, ArrowRight } from "lucide-react";
+import { AlertCircle, CheckCircle2, ArrowLeft, ArrowRight, Clock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,7 @@ interface Question {
 interface TestStartResponse {
   testInstance: TestInstance;
   questions: Question[];
+  timeLimit: number | null; // Time limit in minutes
 }
 
 export default function TakeTest() {
@@ -35,6 +36,10 @@ export default function TakeTest() {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [testData, setTestData] = useState<TestStartResponse | null>(null);
   const [isStarting, setIsStarting] = useState(true);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null); // Time remaining in seconds (for display)
+  const timeRemainingRef = useRef<number | null>(null); // Ref to hold current time remaining
+  const hasAutoSubmitted = useRef(false); // Prevent multiple auto-submissions
+  const timerRef = useRef<NodeJS.Timeout | null>(null); // Hold the interval reference
 
   // Start the test on mount
   useEffect(() => {
@@ -57,6 +62,49 @@ export default function TakeTest() {
     }
   }, [testId, assessmentId]);
 
+  // Timer effect - runs once when testData is loaded
+  useEffect(() => {
+    if (!testData || !testData.timeLimit || timerRef.current) return;
+
+    // Initialize time remaining
+    const initialTime = testData.timeLimit * 60; // Convert minutes to seconds
+    timeRemainingRef.current = initialTime;
+    setTimeRemaining(initialTime);
+
+    // Start countdown interval (runs once per test)
+    timerRef.current = setInterval(() => {
+      if (timeRemainingRef.current === null || timeRemainingRef.current <= 0) {
+        return;
+      }
+
+      timeRemainingRef.current -= 1;
+      setTimeRemaining(timeRemainingRef.current);
+
+      // Auto-submit when time reaches zero
+      if (timeRemainingRef.current === 0 && !hasAutoSubmitted.current && !submitMutation.isPending) {
+        hasAutoSubmitted.current = true;
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        toast({
+          title: "Time's Up!",
+          description: "The test is being automatically submitted.",
+          variant: "destructive",
+        });
+        submitMutation.mutate();
+      }
+    }, 1000);
+
+    // Cleanup on unmount
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [testData]);
+
   // Submit test mutation
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -66,6 +114,11 @@ export default function TakeTest() {
       return result;
     },
     onSuccess: (result: any) => {
+      // Clear timer on successful submission
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       toast({
         title: "Test Submitted",
         description: result.passed
@@ -77,6 +130,7 @@ export default function TakeTest() {
       }
     },
     onError: () => {
+      // Don't clear timer on error - allow student to retry
       toast({
         title: "Error",
         description: "Failed to submit test. Please try again.",
@@ -106,6 +160,13 @@ export default function TakeTest() {
   }
 
   const { questions } = testData;
+
+  // Format time remaining as MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
   
   // Check if test has no questions
   if (!questions || questions.length === 0) {
@@ -169,8 +230,21 @@ export default function TakeTest() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold" data-testid="text-test-title">Test in Progress</h1>
-            <div className="text-sm text-muted-foreground" data-testid="text-progress">
-              Question {currentQuestionIndex + 1} of {questions.length}
+            <div className="flex items-center gap-4">
+              {timeRemaining !== null && (
+                <div 
+                  className={`flex items-center gap-2 font-medium ${
+                    timeRemaining < 300 ? 'text-destructive' : 'text-foreground'
+                  }`}
+                  data-testid="text-time-remaining"
+                >
+                  <Clock className="h-4 w-4" />
+                  {formatTime(timeRemaining)}
+                </div>
+              )}
+              <div className="text-sm text-muted-foreground" data-testid="text-progress">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </div>
             </div>
           </div>
           <Progress value={progress} className="h-2" data-testid="progress-bar" />

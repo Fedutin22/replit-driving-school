@@ -27,6 +27,7 @@ const testTemplateSchema = z.object({
   randomizeQuestions: z.boolean().default(false),
   passingPercentage: z.string().min(1, "Passing percentage is required"),
   maxAttempts: z.string().min(1, "Max attempts is required"),
+  timeLimit: z.string().optional(), // Time limit in minutes (empty = no limit)
 });
 
 type TestTemplateForm = z.infer<typeof testTemplateSchema>;
@@ -85,6 +86,7 @@ export default function AdminTestTemplates() {
       randomizeQuestions: false,
       passingPercentage: "70",
       maxAttempts: "3",
+      timeLimit: "",
     },
   });
 
@@ -96,6 +98,7 @@ export default function AdminTestTemplates() {
         randomizeQuestions: data.randomizeQuestions,
         passingPercentage: parseInt(data.passingPercentage),
         maxAttempts: parseInt(data.maxAttempts),
+        timeLimit: data.timeLimit ? parseInt(data.timeLimit) : null,
       };
       
       if (editingTemplate) {
@@ -134,6 +137,7 @@ export default function AdminTestTemplates() {
         randomizeQuestions: template.randomizeQuestions || false,
         passingPercentage: template.passingPercentage.toString(),
         maxAttempts: template.maxAttempts.toString(),
+        timeLimit: template.timeLimit?.toString() || "",
       });
     } else {
       setEditingTemplate(null);
@@ -145,6 +149,7 @@ export default function AdminTestTemplates() {
         randomizeQuestions: false,
         passingPercentage: "70",
         maxAttempts: "3",
+        timeLimit: "",
       });
     }
     setIsDialogOpen(true);
@@ -223,7 +228,7 @@ export default function AdminTestTemplates() {
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="mode"
@@ -258,6 +263,8 @@ export default function AdminTestTemplates() {
                       </FormItem>
                     )}
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="maxAttempts"
@@ -267,6 +274,26 @@ export default function AdminTestTemplates() {
                         <FormControl>
                           <Input data-testid="input-max-attempts" type="number" min="1" {...field} />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="timeLimit"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Time Limit (minutes)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            data-testid="input-time-limit" 
+                            type="number" 
+                            min="1"
+                            placeholder="Leave empty for no limit" 
+                            {...field} 
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs">Optional time limit for test completion</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
