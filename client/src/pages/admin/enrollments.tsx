@@ -104,7 +104,7 @@ export default function AdminEnrollments() {
                       {enrollment.student.email}
                     </TableCell>
                     <TableCell>
-                      <Link href={`/courses/${enrollment.course.id}`} data-testid={`link-course-${enrollment.id}`}>
+                      <Link href={`/admin/courses/${enrollment.course.id}`} data-testid={`link-course-${enrollment.id}`}>
                         <div className="flex items-center gap-2 hover-elevate rounded-md px-2 py-1 -mx-2 -my-1">
                           <GraduationCap className="h-4 w-4 text-muted-foreground" />
                           <span className="text-primary underline-offset-4 hover:underline">{enrollment.course.name}</span>
