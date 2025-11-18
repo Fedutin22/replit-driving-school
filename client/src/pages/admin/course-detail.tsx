@@ -9,11 +9,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, FileText, Calendar, ClipboardCheck, Users, GraduationCap } from "lucide-react";
 import type { Course } from "@shared/schema";
-import { CourseContentManager } from "./course-content-manager";
-import { ScheduleManager } from "./schedule-manager";
-import { EnrolledStudents } from "./enrolled-students";
-import { CoursePostsManager } from "./course-posts-manager";
-import { CourseAssessmentsManager } from "./course-assessments-manager";
+import { CourseContentManager } from "./course-content-manager.tsx";
+import { ScheduleManager } from "./schedule-manager.tsx";
+import { EnrolledStudents } from "./enrolled-students.tsx";
+import { CoursePostsManager } from "./course-posts-manager.tsx";
+import { CourseAssessmentsManager } from "./course-assessments-manager.tsx";
 
 type CourseWithCounts = Course & { 
   scheduleCount: number; 
