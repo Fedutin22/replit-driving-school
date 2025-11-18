@@ -7,6 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,17 +29,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileQuestion, Plus, Search, Edit2, Trash2, CheckSquare, Square } from "lucide-react";
-import type { Question, Course, Topic } from "@shared/schema";
+import { FileQuestion, Plus, Search, Edit2, Trash2, CheckSquare, Square, Home } from "lucide-react";
+import type { Question, QuestionCategory, QuestionTopic } from "@shared/schema";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
-
-interface QuestionWithDetails extends Question {
-  courseName?: string;
-  topicName?: string;
-}
+import { Link, useParams } from "wouter";
 
 interface QuestionChoice {
   label: string;
@@ -39,6 +43,7 @@ interface QuestionChoice {
 }
 
 export default function Questions() {
+  const { topicId } = useParams<{ topicId: string }>();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -47,24 +52,31 @@ export default function Questions() {
   const [questionText, setQuestionText] = useState("");
   const [explanation, setExplanation] = useState("");
   const [type, setType] = useState<"single_choice" | "multiple_choice">("single_choice");
-  const [courseId, setCourseId] = useState("");
-  const [topicId, setTopicId] = useState("");
   const [choices, setChoices] = useState<QuestionChoice[]>([
     { label: "", isCorrect: false },
     { label: "", isCorrect: false },
   ]);
 
-  const { data: questions, isLoading } = useQuery<QuestionWithDetails[]>({
-    queryKey: ["/api/questions"],
+  const { data: topic } = useQuery<QuestionTopic>({
+    queryKey: [`/api/question-topics/${topicId}`],
+    enabled: !!topicId,
   });
 
-  const { data: courses } = useQuery<Course[]>({
-    queryKey: ["/api/admin/courses"],
+  const { data: category } = useQuery<QuestionCategory>({
+    queryKey: [`/api/question-categories/${topic?.categoryId}`],
+    enabled: !!topic?.categoryId,
   });
 
-  const { data: topics } = useQuery<Topic[]>({
-    queryKey: ["/api/topics"],
-    enabled: !!courseId,
+  const { data: questions, isLoading } = useQuery<Question[]>({
+    queryKey: ["/api/questions", { topicId }],
+    queryFn: async () => {
+      const response = await fetch(`/api/questions?topicId=${topicId}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to fetch questions");
+      return response.json();
+    },
+    enabled: !!topicId,
   });
 
   const createMutation = useMutation({
@@ -72,7 +84,7 @@ export default function Questions() {
       await apiRequest("POST", "/api/questions", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/questions", { topicId }] });
       resetForm();
       setIsDialogOpen(false);
       toast({
@@ -94,7 +106,7 @@ export default function Questions() {
       await apiRequest("PATCH", `/api/questions/${data.id}`, data.updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/questions", { topicId }] });
       resetForm();
       setIsDialogOpen(false);
       toast({
@@ -116,7 +128,7 @@ export default function Questions() {
       await apiRequest("DELETE", `/api/questions/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/questions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/questions", { topicId }] });
       toast({
         title: "Question Deleted",
         description: "The question has been removed from the question bank",
@@ -135,8 +147,6 @@ export default function Questions() {
     setQuestionText("");
     setExplanation("");
     setType("single_choice");
-    setCourseId("");
-    setTopicId("");
     setChoices([
       { label: "", isCorrect: false },
       { label: "", isCorrect: false },
@@ -154,20 +164,44 @@ export default function Questions() {
     setQuestionText(question.questionText);
     setExplanation(question.explanation || "");
     setType(question.type);
-    setCourseId(question.courseId || "");
-    setTopicId(question.topicId || "");
     setChoices(question.choices as QuestionChoice[]);
     setIsDialogOpen(true);
   };
 
   const handleSubmit = () => {
+    if (!questionText.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Question text is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (choices.filter(c => c.label.trim()).length < 2) {
+      toast({
+        title: "Validation Error",
+        description: "At least 2 choices are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!choices.some(c => c.isCorrect)) {
+      toast({
+        title: "Validation Error",
+        description: "At least one correct answer is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const data = {
       questionText,
       explanation,
       type,
-      courseId: courseId || null,
-      topicId: topicId || null,
-      choices,
+      questionTopicId: topicId,
+      choices: choices.filter(c => c.label.trim()),
     };
 
     if (editingQuestion) {
@@ -198,38 +232,63 @@ export default function Questions() {
 
   const filteredQuestions = questions?.filter((q) => {
     const searchLower = searchQuery.toLowerCase();
-    return (
-      q.questionText.toLowerCase().includes(searchLower) ||
-      q.courseName?.toLowerCase().includes(searchLower) ||
-      q.topicName?.toLowerCase().includes(searchLower)
-    );
+    return q.questionText.toLowerCase().includes(searchLower);
   });
 
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
+        <Skeleton className="h-6 w-96 mb-4" />
         <div>
           <Skeleton className="h-8 w-64 mb-2" />
           <Skeleton className="h-4 w-96" />
         </div>
-        <Card>
-          <CardContent className="p-6">
-            <Skeleton className="h-96 w-full" />
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-48" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="p-6 space-y-6">
+      <Breadcrumb data-testid="breadcrumb-questions">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/question-categories">
+                <Home className="h-4 w-4" />
+              </Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/question-categories">Question Bank</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href={`/question-topics/${category?.id}`}>{category?.name || "..."}</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{topic?.name || "..."}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2" data-testid="heading-questions">
-            Question Bank
+            {topic?.name}
           </h1>
           <p className="text-muted-foreground">
-            Manage questions for tests and assessments
+            {topic?.description || "Manage questions in this topic"}
           </p>
         </div>
         <Button onClick={openCreateDialog} data-testid="button-create-question">
@@ -271,12 +330,6 @@ export default function Questions() {
                           </>
                         )}
                       </Badge>
-                      {question.courseName && (
-                        <Badge variant="outline">{question.courseName}</Badge>
-                      )}
-                      {question.topicName && (
-                        <Badge variant="outline">{question.topicName}</Badge>
-                      )}
                     </div>
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
@@ -291,10 +344,14 @@ export default function Questions() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => deleteMutation.mutate(question.id)}
+                      onClick={() => {
+                        if (confirm("Are you sure you want to delete this question?")) {
+                          deleteMutation.mutate(question.id);
+                        }
+                      }}
                       data-testid={`button-delete-${question.id}`}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 </div>
@@ -328,7 +385,7 @@ export default function Questions() {
             <CardContent className="flex flex-col items-center justify-center py-16">
               <FileQuestion className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-lg font-medium text-foreground mb-2">No questions found</p>
-              <p className="text-sm text-muted-foreground">Add questions to build your question bank</p>
+              <p className="text-sm text-muted-foreground">Add questions to this topic</p>
             </CardContent>
           </Card>
         )}
@@ -355,35 +412,17 @@ export default function Questions() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="type">Question Type *</Label>
-                <Select value={type} onValueChange={(v: any) => setType(v)}>
-                  <SelectTrigger id="type" data-testid="select-question-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="single_choice">Single Choice</SelectItem>
-                    <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="course">Course</Label>
-                <Select value={courseId} onValueChange={setCourseId}>
-                  <SelectTrigger id="course" data-testid="select-course">
-                    <SelectValue placeholder="Select course" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {courses?.map((course) => (
-                      <SelectItem key={course.id} value={course.id}>
-                        {course.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="type">Question Type *</Label>
+              <Select value={type} onValueChange={(v: any) => setType(v)}>
+                <SelectTrigger id="type" data-testid="select-question-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single_choice">Single Choice</SelectItem>
+                  <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

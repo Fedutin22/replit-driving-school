@@ -20,6 +20,8 @@ import SchedulePage from "@/pages/schedule";
 import Payments from "@/pages/payments";
 import Certificates from "@/pages/certificates";
 import Questions from "@/pages/questions";
+import QuestionCategories from "@/pages/question-categories";
+import QuestionTopics from "@/pages/question-topics";
 import InstructorAttendance from "@/pages/instructor/attendance";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
@@ -64,7 +66,9 @@ function Router() {
           <Route path="/schedule" component={SchedulePage} />
           <Route path="/payments" component={Payments} />
           <Route path="/certificates" component={Certificates} />
-          <Route path="/questions" component={Questions} />
+          <Route path="/question-categories" component={QuestionCategories} />
+          <Route path="/question-topics/:categoryId" component={QuestionTopics} />
+          <Route path="/questions/:topicId" component={Questions} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={AdminUsers} />
           <Route path="/admin/enrollments" component={AdminEnrollments} />

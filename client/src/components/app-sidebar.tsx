@@ -47,7 +47,7 @@ export function AppSidebar() {
     { title: "My Schedule", url: "/instructor/schedule", icon: Calendar },
     { title: "My Courses", url: "/instructor/courses", icon: BookOpen },
     { title: "Attendance", url: "/instructor/attendance", icon: ClipboardList },
-    { title: "Question Bank", url: "/questions", icon: FileQuestion },
+    { title: "Question Bank", url: "/question-categories", icon: FileQuestion },
     { title: "Test Templates", url: "/test-templates", icon: FileText },
   ];
 
@@ -56,7 +56,7 @@ export function AppSidebar() {
     { title: "Users", url: "/admin/users", icon: Users },
     { title: "Enrollments", url: "/admin/enrollments", icon: ClipboardList },
     { title: "Courses", url: "/admin/courses", icon: BookOpen },
-    { title: "Question Bank", url: "/admin/questions", icon: FileQuestion },
+    { title: "Question Bank", url: "/question-categories", icon: FileQuestion },
     { title: "Test Templates", url: "/admin/test-templates", icon: FileText },
     { title: "Schedule", url: "/admin/schedule", icon: Calendar },
     { title: "Payments", url: "/admin/payments", icon: CreditCard },
