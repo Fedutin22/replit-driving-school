@@ -74,12 +74,11 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
   });
 
   const { data: instructors } = useQuery<User[]>({
-    queryKey: ["/api/admin/instructors"],
+    queryKey: ["/api/instructors"],
     queryFn: async () => {
-      const response = await fetch("/api/admin/users");
-      if (!response.ok) throw new Error("Failed to fetch users");
-      const users = await response.json();
-      return users.filter((u: User) => u.role === "instructor" || u.role === "admin");
+      const response = await fetch("/api/instructors");
+      if (!response.ok) throw new Error("Failed to fetch instructors");
+      return response.json();
     },
     enabled: open,
   });
@@ -270,9 +269,6 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
                         </div>
                         <div className="flex items-center gap-2">
                           {isPast && <Badge variant="secondary">Past</Badge>}
-                          <Badge variant={seatsLeft > 0 ? "default" : "destructive"}>
-                            {seatsLeft > 0 ? `${seatsLeft} seats left` : "Full"}
-                          </Badge>
                         </div>
                       </div>
                     </CardHeader>

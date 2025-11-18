@@ -27,7 +27,7 @@ The backend is built with Express.js and TypeScript, featuring a dual authentica
 
 **Key Features:**
 
-*   **Schedule Management:** Admins and instructors can manage course schedules. The system stores schedules in UTC, with frontend conversions to the Riga timezone (UTC+2/3) using `date-fns-tz` to handle Daylight Saving Time. Calendar views are available for students, instructors, and admins, with role-based filtering and instructor filtering. Sessions are informational only - students cannot register. Attendance is managed manually by instructors and admins.
+*   **Schedule Management:** Admins and instructors can manage course schedules. The system stores schedules in UTC, with frontend conversions to the Riga timezone (UTC+2/3) using `date-fns-tz` to handle Daylight Saving Time. Calendar views are available for students, instructors, and admins, with role-based filtering and instructor filtering. Sessions are informational only - students cannot register. Attendance is managed manually by instructors and admins. The `/api/instructors` endpoint is available to both admins and instructors for fetching the instructor list when creating/editing schedules.
 *   **Course Management Statistics:** The admin course management table displays comprehensive statistics for each course, including topic, post, and schedule counts, optimized with efficient database queries.
 *   **Student Course Schedule Count:** Students can view the number of scheduled sessions for both enrolled and available courses.
 *   **Enrollment Tracking:** Admin-only features for student enrollment overview and progress tracking, with detailed enrollment data and search functionality.
