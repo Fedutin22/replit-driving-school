@@ -119,9 +119,43 @@ export const postsRelations = relations(posts, ({ one }) => ({
   }),
 }));
 
-// Questions table - Standalone question bank (not linked to courses or topics)
+// Question Categories table - Top level of question organization
+export const questionCategories = pgTable("question_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  orderIndex: integer("order_index").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const questionCategoriesRelations = relations(questionCategories, ({ many }) => ({
+  questionTopics: many(questionTopics),
+}));
+
+// Question Topics table - Second level of question organization
+export const questionTopics = pgTable("question_topics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  categoryId: varchar("category_id").notNull().references(() => questionCategories.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  orderIndex: integer("order_index").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const questionTopicsRelations = relations(questionTopics, ({ one, many }) => ({
+  category: one(questionCategories, {
+    fields: [questionTopics.categoryId],
+    references: [questionCategories.id],
+  }),
+  questions: many(questions),
+}));
+
+// Questions table - Third level linked to question topics
 export const questions = pgTable("questions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  questionTopicId: varchar("question_topic_id").references(() => questionTopics.id, { onDelete: "set null" }),
   questionText: text("question_text").notNull(),
   explanation: text("explanation"),
   type: questionTypeEnum("type").notNull(),
@@ -132,7 +166,11 @@ export const questions = pgTable("questions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const questionsRelations = relations(questions, ({ many }) => ({
+export const questionsRelations = relations(questions, ({ one, many }) => ({
+  questionTopic: one(questionTopics, {
+    fields: [questions.questionTopicId],
+    references: [questionTopics.id],
+  }),
   testQuestions: many(testQuestions),
   assessmentQuestions: many(topicAssessmentQuestions),
 }));
@@ -442,6 +480,12 @@ export type Topic = typeof topics.$inferSelect;
 export type InsertPost = typeof posts.$inferInsert;
 export type Post = typeof posts.$inferSelect;
 
+export type InsertQuestionCategory = typeof questionCategories.$inferInsert;
+export type QuestionCategory = typeof questionCategories.$inferSelect;
+
+export type InsertQuestionTopic = typeof questionTopics.$inferInsert;
+export type QuestionTopic = typeof questionTopics.$inferSelect;
+
 export type InsertQuestion = typeof questions.$inferInsert;
 export type Question = typeof questions.$inferSelect;
 
@@ -498,6 +542,18 @@ export const insertTopicSchema = createInsertSchema(topics).omit({
 });
 
 export const insertPostSchema = createInsertSchema(posts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQuestionCategorySchema = createInsertSchema(questionCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQuestionTopicSchema = createInsertSchema(questionTopics).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
