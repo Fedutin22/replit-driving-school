@@ -59,6 +59,7 @@ export function AppSidebar() {
     { title: "Question Bank", url: "/question-categories", icon: FileQuestion },
     { title: "Test Templates", url: "/admin/test-templates", icon: FileText },
     { title: "Schedule", url: "/admin/schedule", icon: Calendar },
+    { title: "Attendance", url: "/instructor/attendance", icon: ClipboardList },
     { title: "Payments", url: "/admin/payments", icon: CreditCard },
     { title: "Certificates", url: "/admin/certificates", icon: Award },
     { title: "Reports", url: "/admin/reports", icon: BarChart3 },
