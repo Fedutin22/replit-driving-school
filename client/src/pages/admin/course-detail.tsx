@@ -28,9 +28,6 @@ export default function AdminCourseDetail() {
   const [, params] = useRoute("/admin/courses/:id");
   const courseId = params?.id;
   const [activeTab, setActiveTab] = useState("topics");
-  const [showTopicsManager, setShowTopicsManager] = useState(false);
-  const [showScheduleManager, setShowScheduleManager] = useState(false);
-  const [showStudentsManager, setShowStudentsManager] = useState(false);
 
   const { data: courses, isLoading } = useQuery<CourseWithCounts[]>({
     queryKey: ["/api/admin/courses"],
@@ -169,25 +166,7 @@ export default function AdminCourseDetail() {
           </TabsList>
 
           <TabsContent value="topics" className="mt-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Topics & Content</CardTitle>
-                    <CardDescription>Manage topics, posts, and assessments for this course</CardDescription>
-                  </div>
-                  <Button onClick={() => setShowTopicsManager(true)} data-testid="button-manage-topics">
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Manage Content
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Click "Manage Content" to add and organize topics, create posts, and set up assessments for students.
-                </p>
-              </CardContent>
-            </Card>
+            <CourseContentManager course={course} open={true} onClose={() => {}} />
           </TabsContent>
 
           <TabsContent value="posts" className="mt-6">
@@ -199,74 +178,14 @@ export default function AdminCourseDetail() {
           </TabsContent>
 
           <TabsContent value="schedule" className="mt-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Session Schedule</CardTitle>
-                    <CardDescription>Manage class sessions and attendance</CardDescription>
-                  </div>
-                  <Button onClick={() => setShowScheduleManager(true)} data-testid="button-manage-schedule">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Manage Schedule
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Click "Manage Schedule" to create sessions, assign instructors, and track attendance.
-                </p>
-              </CardContent>
-            </Card>
+            <ScheduleManager course={course} open={true} onClose={() => {}} />
           </TabsContent>
 
           <TabsContent value="students" className="mt-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Enrolled Students</CardTitle>
-                    <CardDescription>View student enrollments and progress</CardDescription>
-                  </div>
-                  <Button onClick={() => setShowStudentsManager(true)} data-testid="button-view-students">
-                    <Users className="h-4 w-4 mr-2" />
-                    View Students
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Click "View Students" to see all enrolled students and track their progress.
-                </p>
-              </CardContent>
-            </Card>
+            <EnrolledStudents course={course} open={true} onClose={() => {}} />
           </TabsContent>
         </Tabs>
       </div>
-
-      {showTopicsManager && (
-        <CourseContentManager
-          course={course}
-          open={showTopicsManager}
-          onClose={() => setShowTopicsManager(false)}
-        />
-      )}
-
-      {showScheduleManager && (
-        <ScheduleManager
-          course={course}
-          open={showScheduleManager}
-          onClose={() => setShowScheduleManager(false)}
-        />
-      )}
-
-      {showStudentsManager && (
-        <EnrolledStudents
-          course={course}
-          open={showStudentsManager}
-          onClose={() => setShowStudentsManager(false)}
-        />
-      )}
     </div>
   );
 }
