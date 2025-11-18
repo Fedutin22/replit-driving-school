@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
 import Stripe from "stripe";
 import { z } from "zod";
-import { insertCourseSchema, insertTopicSchema, insertPostSchema, insertQuestionSchema, insertTestTemplateSchema, insertScheduleSchema, topicAssessments } from "@shared/schema";
+import { insertCourseSchema, insertTopicSchema, insertPostSchema, insertQuestionCategorySchema, insertQuestionTopicSchema, insertQuestionSchema, insertTestTemplateSchema, insertScheduleSchema, topicAssessments } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import express from "express";
@@ -678,10 +678,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Question category routes
+  app.get('/api/question-categories', isAuthenticated, async (req: any, res) => {
+    try {
+      const categories = await storage.getQuestionCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching question categories:", error);
+      res.status(500).json({ message: "Failed to fetch question categories" });
+    }
+  });
+
+  app.get('/api/question-categories/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const category = await storage.getQuestionCategory(id);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error fetching question category:", error);
+      res.status(500).json({ message: "Failed to fetch question category" });
+    }
+  });
+
+  app.post('/api/question-categories', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      const categoryData = insertQuestionCategorySchema.parse(req.body);
+      const category = await storage.createQuestionCategory(categoryData);
+
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "CREATE_QUESTION_CATEGORY",
+          entityType: "question_category",
+          entityId: category.id,
+        });
+      }
+
+      res.json(category);
+    } catch (error) {
+      console.error("Error creating question category:", error);
+      res.status(500).json({ message: "Failed to create question category" });
+    }
+  });
+
+  app.patch('/api/question-categories/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      const { id } = req.params;
+      const categoryData = insertQuestionCategorySchema.partial().parse(req.body);
+      const category = await storage.updateQuestionCategory(id, categoryData);
+
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "UPDATE_QUESTION_CATEGORY",
+          entityType: "question_category",
+          entityId: id,
+        });
+      }
+
+      res.json(category);
+    } catch (error) {
+      console.error("Error updating question category:", error);
+      res.status(500).json({ message: "Failed to update question category" });
+    }
+  });
+
+  app.delete('/api/question-categories/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      const { id } = req.params;
+      await storage.deleteQuestionCategory(id);
+
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "DELETE_QUESTION_CATEGORY",
+          entityType: "question_category",
+          entityId: id,
+        });
+      }
+
+      res.json({ message: "Question category deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting question category:", error);
+      res.status(500).json({ message: "Failed to delete question category" });
+    }
+  });
+
+  // Question topic routes
+  app.get('/api/question-categories/:categoryId/topics', isAuthenticated, async (req: any, res) => {
+    try {
+      const { categoryId } = req.params;
+      const topics = await storage.getQuestionTopics(categoryId);
+      res.json(topics);
+    } catch (error) {
+      console.error("Error fetching question topics:", error);
+      res.status(500).json({ message: "Failed to fetch question topics" });
+    }
+  });
+
+  app.get('/api/question-topics/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const topic = await storage.getQuestionTopic(id);
+      if (!topic) {
+        return res.status(404).json({ message: "Topic not found" });
+      }
+      res.json(topic);
+    } catch (error) {
+      console.error("Error fetching question topic:", error);
+      res.status(500).json({ message: "Failed to fetch question topic" });
+    }
+  });
+
+  app.post('/api/question-topics', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      const topicData = insertQuestionTopicSchema.parse(req.body);
+      const topic = await storage.createQuestionTopic(topicData);
+
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "CREATE_QUESTION_TOPIC",
+          entityType: "question_topic",
+          entityId: topic.id,
+        });
+      }
+
+      res.json(topic);
+    } catch (error) {
+      console.error("Error creating question topic:", error);
+      res.status(500).json({ message: "Failed to create question topic" });
+    }
+  });
+
+  app.patch('/api/question-topics/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      const { id } = req.params;
+      const topicData = insertQuestionTopicSchema.partial().parse(req.body);
+      const topic = await storage.updateQuestionTopic(id, topicData);
+
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "UPDATE_QUESTION_TOPIC",
+          entityType: "question_topic",
+          entityId: id,
+        });
+      }
+
+      res.json(topic);
+    } catch (error) {
+      console.error("Error updating question topic:", error);
+      res.status(500).json({ message: "Failed to update question topic" });
+    }
+  });
+
+  app.delete('/api/question-topics/:id', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.claims.sub);
+      const { id } = req.params;
+      await storage.deleteQuestionTopic(id);
+
+      if (user) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "DELETE_QUESTION_TOPIC",
+          entityType: "question_topic",
+          entityId: id,
+        });
+      }
+
+      res.json({ message: "Question topic deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting question topic:", error);
+      res.status(500).json({ message: "Failed to delete question topic" });
+    }
+  });
+
   // Questions routes
   app.get('/api/questions', isAuthenticated, async (req: any, res) => {
     try {
-      const questions = await storage.getQuestions();
+      const { topicId } = req.query;
+      const questions = await storage.getQuestions(topicId as string | undefined);
       res.json(questions);
     } catch (error) {
       console.error("Error fetching questions:", error);
