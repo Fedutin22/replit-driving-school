@@ -18,7 +18,6 @@ interface ScheduleWithDetails extends Schedule {
   topic: Topic | null;
   instructor: User;
   registeredStudentsCount: number;
-  isRegistered?: boolean;
 }
 
 export default function SchedulePage() {
@@ -50,68 +49,6 @@ export default function SchedulePage() {
       }, 500);
     }
   }, [isAuthenticated, authLoading, toast]);
-
-  const registerMutation = useMutation({
-    mutationFn: async (scheduleId: string) => {
-      await apiRequest("POST", `/api/schedules/${scheduleId}/register`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
-      toast({
-        title: "Registration Successful",
-        description: "You have been registered for this session",
-      });
-    },
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Registration Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const unregisterMutation = useMutation({
-    mutationFn: async (scheduleId: string) => {
-      await apiRequest("DELETE", `/api/schedules/${scheduleId}/register`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
-      toast({
-        title: "Unregistered",
-        description: "You have been removed from this session",
-      });
-    },
-    onError: (error: Error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Unregistration Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
 
@@ -309,9 +246,6 @@ export default function SchedulePage() {
                               data-testid={`time-slot-${hour}-${dayIndex}`}
                             >
                               {hourSchedules.map((schedule) => {
-                                const availableSeats = schedule.capacity - schedule.registeredStudentsCount;
-                                const isFull = availableSeats <= 0;
-
                                 return (
                                   <Card
                                     key={schedule.id}
@@ -331,11 +265,6 @@ export default function SchedulePage() {
                                               : schedule.course.name}
                                           </p>
                                         </div>
-                                        {schedule.isRegistered && (
-                                          <Badge variant="default" className="text-xs shrink-0">
-                                            Registered
-                                          </Badge>
-                                        )}
                                       </div>
 
                                       <div className="space-y-0.5 text-xs text-muted-foreground">
@@ -359,47 +288,7 @@ export default function SchedulePage() {
                                             <span className="truncate">{schedule.location}</span>
                                           </div>
                                         )}
-
-                                        <div className="flex items-center gap-1">
-                                          <Users className="h-3 w-3 shrink-0" />
-                                          <span>
-                                            {schedule.registeredStudentsCount}/{schedule.capacity}
-                                          </span>
-                                          {isFull && (
-                                            <Badge variant="destructive" className="text-xs ml-1">
-                                              Full
-                                            </Badge>
-                                          )}
-                                        </div>
                                       </div>
-
-                                      {isStudent && new Date(schedule.startTime) > new Date() && (
-                                        <div className="pt-1">
-                                          {schedule.isRegistered ? (
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              className="w-full text-xs h-7"
-                                              onClick={() => unregisterMutation.mutate(schedule.id)}
-                                              disabled={unregisterMutation.isPending}
-                                              data-testid={`button-unregister-${schedule.id}`}
-                                            >
-                                              {unregisterMutation.isPending ? "Canceling..." : "Cancel"}
-                                            </Button>
-                                          ) : (
-                                            <Button
-                                              variant="default"
-                                              size="sm"
-                                              className="w-full text-xs h-7"
-                                              onClick={() => registerMutation.mutate(schedule.id)}
-                                              disabled={isFull || registerMutation.isPending}
-                                              data-testid={`button-register-${schedule.id}`}
-                                            >
-                                              {registerMutation.isPending ? "Registering..." : isFull ? "Full" : "Register"}
-                                            </Button>
-                                          )}
-                                        </div>
-                                      )}
                                     </div>
                                   </Card>
                                 );
