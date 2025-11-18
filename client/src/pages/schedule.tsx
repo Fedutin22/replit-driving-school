@@ -1,15 +1,12 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar as CalendarIcon, Clock, MapPin, Users, BookOpen, User as UserIcon, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, MapPin, BookOpen, User as UserIcon, ChevronLeft, ChevronRight, Filter } from "lucide-react";
 import type { Schedule, Course, Topic, User } from "@shared/schema";
 import { format, startOfWeek, addDays, isSameDay, parseISO } from "date-fns";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
 
@@ -17,7 +14,6 @@ interface ScheduleWithDetails extends Schedule {
   course: Course;
   topic: Topic | null;
   instructor: User;
-  registeredStudentsCount: number;
 }
 
 export default function SchedulePage() {
