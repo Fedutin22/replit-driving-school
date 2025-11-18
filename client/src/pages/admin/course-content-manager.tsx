@@ -516,18 +516,8 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
     setIsAssessmentDialogOpen(true);
   };
 
-  return (
-    <>
-      <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Course Content: {course.name}</DialogTitle>
-            <DialogDescription>
-              Organize topics and posts for this course
-            </DialogDescription>
-          </DialogHeader>
-
-          <Tabs defaultValue="topics" className="mt-4">
+  const content = (
+          <Tabs defaultValue="topics" className={embedded ? "" : "mt-4"}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="topics" data-testid="tab-topics">
                 <List className="h-4 w-4 mr-2" />
@@ -838,6 +828,20 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
               )}
             </TabsContent>
           </Tabs>
+  );
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Course Content: {course.name}</DialogTitle>
+            <DialogDescription>
+              Organize topics and posts for this course
+            </DialogDescription>
+          </DialogHeader>
+
+          {content}
         </DialogContent>
       </Dialog>
 

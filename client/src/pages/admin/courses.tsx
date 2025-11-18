@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, BookOpen, FileText, Calendar, Users, GraduationCap, Filter } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Edit, BookOpen, Filter, ChevronRight } from "lucide-react";
 import type { Course, User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -16,9 +17,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CourseContentManager } from "./course-content-manager";
-import { ScheduleManager } from "./schedule-manager";
-import { EnrolledStudents } from "./enrolled-students";
+import { Link } from "wouter";
 
 const courseSchema = z.object({
   name: z.string().min(1, "Course name is required"),
@@ -41,9 +40,6 @@ export default function AdminCourses() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-  const [managingCourse, setManagingCourse] = useState<Course | null>(null);
-  const [managingSchedules, setManagingSchedules] = useState<Course | null>(null);
-  const [viewingStudents, setViewingStudents] = useState<Course | null>(null);
   const [selectedInstructor, setSelectedInstructor] = useState<string>("all");
 
   const { data: courses, isLoading } = useQuery<CourseWithCounts[]>({
@@ -124,11 +120,7 @@ export default function AdminCourses() {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64" />
-          <Skeleton className="h-64" />
-        </div>
+        <Skeleton className="h-96" />
       </div>
     );
   }
@@ -284,159 +276,96 @@ export default function AdminCourses() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCourses.map((course) => (
-              <Card key={course.id} className="hover-elevate" data-testid={`card-course-${course.id}`}>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate" title={course.name} data-testid={`text-name-${course.id}`}>
-                        {course.name}
-                      </CardTitle>
-                      {course.description && (
-                        <CardDescription className="mt-1 line-clamp-2" title={course.description}>
-                          {course.description}
-                        </CardDescription>
-                      )}
-                    </div>
-                    <Badge variant={course.isActive ? "default" : "secondary"} data-testid={`badge-status-${course.id}`}>
-                      {course.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    {course.category && (
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Category</p>
-                        <p className="text-sm font-medium" data-testid={`text-category-${course.id}`}>
-                          {course.category}
-                        </p>
-                      </div>
-                    )}
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Price</p>
-                      <p className="text-sm font-medium" data-testid={`text-price-${course.id}`}>
-                        ${course.price || "0.00"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Students</p>
-                        <p className="text-sm font-semibold" data-testid={`text-students-${course.id}`}>
-                          {course.studentCount}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Passed</p>
-                        <p className="text-sm font-semibold" data-testid={`text-passed-${course.id}`}>
-                          {course.passedCount}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t">
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Topics</p>
-                      <Badge variant="outline" data-testid={`text-topics-${course.id}`}>
-                        {course.topicCount}
-                      </Badge>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Posts</p>
-                      <Badge variant="outline" data-testid={`text-posts-${course.id}`}>
-                        {course.postCount}
-                      </Badge>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Sessions</p>
-                      <Badge variant="outline" data-testid={`text-schedules-${course.id}`}>
-                        {course.scheduleCount}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-
-                <CardFooter className="flex flex-col gap-2 pt-4 border-t">
-                  <div className="flex items-center gap-2 w-full flex-wrap">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setManagingCourse(course)}
-                      data-testid={`button-manage-content-${course.id}`}
-                      className="flex-1 min-w-[100px]"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Content
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setManagingSchedules(course)}
-                      data-testid={`button-manage-schedules-${course.id}`}
-                      className="flex-1 min-w-[100px]"
-                    >
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Schedule
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleOpenDialog(course)}
-                      data-testid={`button-edit-course-${course.id}`}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => setViewingStudents(course)}
-                    data-testid={`button-view-students-${course.id}`}
-                    className="w-full"
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Course Name</TableHead>
+                  <TableHead className="text-center">Topics</TableHead>
+                  <TableHead className="text-center">Students</TableHead>
+                  <TableHead className="text-center">Passed</TableHead>
+                  <TableHead className="text-center">Sessions</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCourses.map((course) => (
+                  <TableRow 
+                    key={course.id} 
+                    className="hover-elevate cursor-pointer"
+                    data-testid={`row-course-${course.id}`}
                   >
-                    <Users className="h-4 w-4 mr-2" />
-                    View Students ({course.studentCount})
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+                    <TableCell>
+                      <Link href={`/admin/courses/${course.id}`}>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium" data-testid={`text-name-${course.id}`}>
+                            {course.name}
+                          </span>
+                          {course.description && (
+                            <span className="text-sm text-muted-foreground line-clamp-1">
+                              {course.description}
+                            </span>
+                          )}
+                          {course.category && (
+                            <Badge variant="outline" className="w-fit" data-testid={`badge-category-${course.id}`}>
+                              {course.category}
+                            </Badge>
+                          )}
+                        </div>
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-center" data-testid={`text-topics-${course.id}`}>
+                      <Badge variant="secondary">{course.topicCount}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center" data-testid={`text-students-${course.id}`}>
+                      <Badge variant="secondary">{course.studentCount}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center" data-testid={`text-passed-${course.id}`}>
+                      <Badge variant="secondary">{course.passedCount}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center" data-testid={`text-sessions-${course.id}`}>
+                      <Badge variant="secondary">{course.scheduleCount}</Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge 
+                        variant={course.isActive ? "default" : "secondary"} 
+                        data-testid={`badge-status-${course.id}`}
+                      >
+                        {course.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 justify-end">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleOpenDialog(course);
+                          }}
+                          data-testid={`button-edit-course-${course.id}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Link href={`/admin/courses/${course.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-testid={`button-view-course-${course.id}`}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         )}
       </div>
-
-      {managingCourse && (
-        <CourseContentManager
-          course={managingCourse}
-          open={!!managingCourse}
-          onClose={() => setManagingCourse(null)}
-        />
-      )}
-
-      {managingSchedules && (
-        <ScheduleManager
-          course={managingSchedules}
-          open={!!managingSchedules}
-          onClose={() => setManagingSchedules(null)}
-        />
-      )}
-
-      {viewingStudents && (
-        <EnrolledStudents
-          course={viewingStudents}
-          open={!!viewingStudents}
-          onClose={() => setViewingStudents(null)}
-        />
-      )}
     </div>
   );
 }
