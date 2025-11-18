@@ -832,18 +832,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Course Content: {course.name}</DialogTitle>
-            <DialogDescription>
-              Organize topics and posts for this course
-            </DialogDescription>
-          </DialogHeader>
-
-          {content}
-        </DialogContent>
-      </Dialog>
+      {content}
 
       <Dialog open={isTopicDialogOpen} onOpenChange={setIsTopicDialogOpen}>
         <DialogContent>

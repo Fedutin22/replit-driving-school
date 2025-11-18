@@ -204,15 +204,7 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
   };
 
   return (
-    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl">Manage Schedules - {course.name}</DialogTitle>
-          <DialogDescription>
-            Create and manage session schedules for this course
-          </DialogDescription>
-        </DialogHeader>
-
+    <>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -335,7 +327,6 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
             </div>
           )}
         </div>
-      </DialogContent>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
@@ -558,6 +549,6 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Dialog>
+    </>
   );
 }

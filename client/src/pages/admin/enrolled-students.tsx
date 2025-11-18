@@ -68,16 +68,8 @@ export function EnrolledStudents({ course, open, onClose }: EnrolledStudentsProp
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Enrolled Students - {course.name}</DialogTitle>
-          <DialogDescription>
-            View student enrollment status and test progress
-          </DialogDescription>
-        </DialogHeader>
-
-        <ScrollArea className="h-[calc(90vh-8rem)]">
+    <>
+        <ScrollArea className="h-[calc(80vh-8rem)]">
           {isLoading ? (
             <div className="space-y-4 p-4">
               <Skeleton className="h-32" />
@@ -213,7 +205,6 @@ export function EnrolledStudents({ course, open, onClose }: EnrolledStudentsProp
             </div>
           )}
         </ScrollArea>
-      </DialogContent>
-    </Dialog>
+    </>
   );
 }
