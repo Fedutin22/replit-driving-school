@@ -540,3 +540,8 @@ export const insertCertificateSchema = createInsertSchema(certificates).omit({
   id: true,
   createdAt: true,
 });
+
+export const insertAttendanceSchema = createInsertSchema(attendance).omit({
+  id: true,
+  markedAt: true,
+});
