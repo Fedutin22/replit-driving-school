@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash, Calendar, Clock, MapPin, Users } from "lucide-react";
+import { Plus, Edit, Trash, Calendar, Clock, MapPin, Users, ClipboardList, CheckCircle, XCircle } from "lucide-react";
 import type { Course, Schedule, Topic, User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +15,7 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 const scheduleSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -34,6 +35,14 @@ interface ScheduleWithDetails extends Schedule {
   registeredCount?: number;
 }
 
+interface StudentAttendance {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  status: 'present' | 'absent' | null;
+}
+
 interface ScheduleManagerProps {
   course: Course;
   open: boolean;
@@ -44,6 +53,7 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
   const { toast } = useToast();
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [attendanceSchedule, setAttendanceSchedule] = useState<Schedule | null>(null);
 
   const { data: schedules, isLoading: schedulesLoading, error: schedulesError } = useQuery<ScheduleWithDetails[]>({
     queryKey: ["/api/admin/courses", course.id, "schedules"],
@@ -136,6 +146,31 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
       toast({
         title: "Error",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const { data: attendanceStudents = [], isLoading: attendanceLoading } = useQuery<StudentAttendance[]>({
+    queryKey: [`/api/instructor/schedules/${attendanceSchedule?.id}/attendance`],
+    enabled: !!attendanceSchedule,
+  });
+
+  const markAttendanceMutation = useMutation({
+    mutationFn: async ({ scheduleId, studentId, status }: { scheduleId: string; studentId: string; status: 'present' | 'absent' }) => {
+      return apiRequest('POST', `/api/instructor/schedules/${scheduleId}/attendance`, { studentId, status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/instructor/schedules/${attendanceSchedule?.id}/attendance`] });
+      toast({
+        title: "Success",
+        description: "Attendance marked successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to mark attendance",
         variant: "destructive",
       });
     },
@@ -272,7 +307,16 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
                           Instructor: {schedule.instructorName} • {schedule.registeredCount || 0}/{schedule.capacity} registered
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAttendanceSchedule(schedule)}
+                          data-testid={`button-attendance-${schedule.id}`}
+                        >
+                          <ClipboardList className="h-4 w-4 mr-2" />
+                          Attendance
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -450,6 +494,90 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!attendanceSchedule} onOpenChange={(open) => !open && setAttendanceSchedule(null)}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Manage Attendance - {attendanceSchedule?.title}</DialogTitle>
+            <DialogDescription>
+              Mark students as present or absent for this session
+            </DialogDescription>
+          </DialogHeader>
+
+          {attendanceLoading ? (
+            <div className="py-8 text-center text-muted-foreground">
+              Loading students...
+            </div>
+          ) : attendanceStudents.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-medium text-foreground mb-2">No students registered</p>
+                <p className="text-sm text-muted-foreground">No students have registered for this session yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {attendanceStudents.map((student) => (
+                <Card key={student.id} data-testid={`card-student-${student.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{student.firstName} {student.lastName}</p>
+                        <p className="text-sm text-muted-foreground truncate">{student.email}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          variant={student.status === 'present' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            if (attendanceSchedule) {
+                              markAttendanceMutation.mutate({
+                                scheduleId: attendanceSchedule.id,
+                                studentId: student.id,
+                                status: 'present',
+                              });
+                            }
+                          }}
+                          disabled={markAttendanceMutation.isPending}
+                          data-testid={`button-present-${student.id}`}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Present
+                        </Button>
+                        <Button
+                          variant={student.status === 'absent' ? 'destructive' : 'outline'}
+                          size="sm"
+                          onClick={() => {
+                            if (attendanceSchedule) {
+                              markAttendanceMutation.mutate({
+                                scheduleId: attendanceSchedule.id,
+                                studentId: student.id,
+                                status: 'absent',
+                              });
+                            }
+                          }}
+                          disabled={markAttendanceMutation.isPending}
+                          data-testid={`button-absent-${student.id}`}
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Absent
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAttendanceSchedule(null)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Dialog>
