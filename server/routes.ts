@@ -498,37 +498,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/schedules/:scheduleId/register', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { scheduleId } = req.params;
-
-      const isRegistered = await storage.isStudentRegistered(scheduleId, userId);
-      if (isRegistered) {
-        return res.status(400).json({ message: "Already registered for this session" });
-      }
-
-      await storage.registerForSession(scheduleId, userId);
-      res.json({ message: "Registered successfully" });
-    } catch (error) {
-      console.error("Error registering for session:", error);
-      res.status(500).json({ message: "Failed to register for session" });
-    }
-  });
-
-  app.delete('/api/schedules/:scheduleId/register', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { scheduleId } = req.params;
-
-      await storage.unregisterFromSession(scheduleId, userId);
-      res.json({ message: "Unregistered successfully" });
-    } catch (error) {
-      console.error("Error unregistering from session:", error);
-      res.status(500).json({ message: "Failed to unregister from session" });
-    }
-  });
-
   // Payments routes
   app.get('/api/payments', isAuthenticated, async (req: any, res) => {
     try {
@@ -1492,12 +1461,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { studentId, status } = validationResult.data;
       
-      // Verify student is registered for this session
-      const isRegistered = await storage.isStudentRegistered(scheduleId, studentId);
-      if (!isRegistered) {
-        return res.status(400).json({ message: "Student is not registered for this session" });
-      }
-
       await storage.markAttendance(scheduleId, studentId, status, userId);
       res.json({ message: "Attendance marked successfully" });
     } catch (error) {
