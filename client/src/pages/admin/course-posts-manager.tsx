@@ -67,8 +67,9 @@ export function CoursePostsManager({ courseId }: CoursePostsManagerProps) {
         ? Math.max(...topic.posts.map(p => p.orderIndex)) + 1
         : 0;
       
-      return await apiRequest("POST", `/api/posts/${topicId}`, {
+      return await apiRequest("POST", `/api/admin/posts`, {
         ...postData,
+        topicId,
         orderIndex: correctOrderIndex,
       });
     },
