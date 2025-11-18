@@ -31,16 +31,16 @@ export default function InstructorAttendance() {
   });
 
   const { data: students = [], isLoading: studentsLoading } = useQuery<StudentAttendance[]>({
-    queryKey: ['/api/instructor/schedules', selectedSchedule, 'attendance'],
+    queryKey: [`/api/instructor/schedules/${selectedSchedule}/attendance`],
     enabled: !!selectedSchedule,
   });
 
   const markAttendanceMutation = useMutation({
     mutationFn: async ({ scheduleId, studentId, status }: { scheduleId: string; studentId: string; status: 'present' | 'absent' }) => {
-      return apiRequest(`/api/instructor/schedules/${scheduleId}/attendance`, 'POST', { studentId, status });
+      return apiRequest('POST', `/api/instructor/schedules/${scheduleId}/attendance`, { studentId, status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/instructor/schedules', selectedSchedule, 'attendance'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/instructor/schedules/${selectedSchedule}/attendance`] });
       toast({
         title: "Success",
         description: "Attendance marked successfully",
