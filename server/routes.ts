@@ -1142,7 +1142,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/courses', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
     try {
-      const courses = await storage.getCoursesWithScheduleCount();
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const allCourses = await storage.getCoursesWithScheduleCount();
+      
+      // Filter courses for instructors to only show their assigned courses
+      let courses = allCourses;
+      if (user?.role === 'instructor') {
+        courses = allCourses.filter(course => course.instructorIds.includes(userId));
+      }
+      
       res.json(courses);
     } catch (error) {
       console.error("Error fetching courses:", error);

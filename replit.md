@@ -18,6 +18,13 @@ The frontend uses React 18 with TypeScript, Vite, TailwindCSS, and shadcn/ui com
 
 The backend is built with Express.js and TypeScript, featuring a dual authentication system supporting Replit Auth (SSO) and email/password. It employs Passport.js for authentication strategies and `connect-pg-simple` for session management with PostgreSQL. Role-based access control is enforced through middleware. The data access layer uses Drizzle ORM with a storage interface pattern for type-safe database interactions and connection pooling via `@neondatabase/serverless`. RESTful APIs are designed with consistent error handling and role-specific endpoints. Stripe is integrated for payment processing, including webhook support.
 
+**Instructor Role Permissions:**
+*   Instructors have access to most admin functionality except: Users management, Enrollments, Reports, and Audit Log
+*   Instructors can only view and manage courses they are assigned to (filtered by schedules)
+*   Instructors cannot create new courses (enforced on backend via `requireRole(['admin'])` on POST `/api/admin/courses`)
+*   Instructors have dedicated navigation menu with no duplicates, using admin URLs for course management
+*   Instructor menu includes: Dashboard, My Courses, Question Bank, Test Templates, Schedule, Attendance, Payments, and Certificates
+
 **Key Features:**
 
 *   **Schedule Management:** Admins and instructors can manage course schedules. The system stores schedules in UTC, with frontend conversions to the Riga timezone (UTC+2/3) using `date-fns-tz` to handle Daylight Saving Time. Calendar views are available for students, instructors, and admins, with role-based filtering and instructor filtering. Sessions are informational only - students cannot register. Attendance is managed manually by instructors and admins.

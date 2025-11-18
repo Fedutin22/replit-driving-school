@@ -43,12 +43,14 @@ export function AppSidebar() {
   ];
 
   const instructorItems = [
-    { title: "Dashboard", url: "/", icon: Home },
-    { title: "My Schedule", url: "/instructor/schedule", icon: Calendar },
-    { title: "My Courses", url: "/instructor/courses", icon: BookOpen },
-    { title: "Attendance", url: "/instructor/attendance", icon: ClipboardList },
+    { title: "Dashboard", url: "/admin", icon: BarChart3 },
+    { title: "My Courses", url: "/admin/courses", icon: BookOpen },
     { title: "Question Bank", url: "/question-categories", icon: FileQuestion },
-    { title: "Test Templates", url: "/test-templates", icon: FileText },
+    { title: "Test Templates", url: "/admin/test-templates", icon: FileText },
+    { title: "Schedule", url: "/admin/schedule", icon: Calendar },
+    { title: "Attendance", url: "/instructor/attendance", icon: ClipboardList },
+    { title: "Payments", url: "/admin/payments", icon: CreditCard },
+    { title: "Certificates", url: "/admin/certificates", icon: Award },
   ];
 
   const adminItems = [
@@ -67,7 +69,7 @@ export function AppSidebar() {
 
   const getMenuItems = () => {
     if (user?.role === "admin") return adminItems;
-    if (user?.role === "instructor") return [...studentItems, ...instructorItems];
+    if (user?.role === "instructor") return instructorItems;
     return studentItems;
   };
 

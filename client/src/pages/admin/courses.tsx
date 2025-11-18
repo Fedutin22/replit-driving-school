@@ -18,6 +18,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Link } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 
 const courseSchema = z.object({
   name: z.string().min(1, "Course name is required"),
@@ -38,6 +39,7 @@ type CourseWithCounts = Course & {
 
 export default function AdminCourses() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [selectedInstructor, setSelectedInstructor] = useState<string>("all");
@@ -155,13 +157,14 @@ export default function AdminCourses() {
               </SelectContent>
             </Select>
           )}
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => handleOpenDialog()} data-testid="button-create-course">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Course
-              </Button>
-            </DialogTrigger>
+          {user?.role === "admin" && (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => handleOpenDialog()} data-testid="button-create-course">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Course
+                </Button>
+              </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>{editingCourse ? "Edit Course" : "Create New Course"}</DialogTitle>
@@ -250,7 +253,8 @@ export default function AdminCourses() {
                 </form>
               </Form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          )}
         </div>
       </div>
 
