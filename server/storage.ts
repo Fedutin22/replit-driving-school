@@ -1620,27 +1620,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getStudentsWithAttendance(scheduleId: string): Promise<Array<{ studentId: string; student: User; status: 'present' | 'absent' | null; markedAt: Date | null }>> {
-    // Get registered students (filter for students only)
-    const registrations = await db
-      .select()
-      .from(sessionRegistrations)
-      .leftJoin(users, eq(sessionRegistrations.studentId, users.id))
-      .where(eq(sessionRegistrations.scheduleId, scheduleId));
+    // First, get the schedule to find out which course it belongs to
+    const schedule = await this.getSchedule(scheduleId);
+    if (!schedule) {
+      return [];
+    }
 
-    // Get attendance records
+    // Get all active enrollments for this course
+    const enrollments = await db
+      .select()
+      .from(courseEnrollments)
+      .leftJoin(users, eq(courseEnrollments.studentId, users.id))
+      .where(
+        and(
+          eq(courseEnrollments.courseId, schedule.courseId),
+          eq(courseEnrollments.isActive, true)
+        )
+      );
+
+    // Get attendance records for this schedule
     const attendanceRecords = await db
       .select()
       .from(attendance)
       .where(eq(attendance.scheduleId, scheduleId));
 
     // Combine data, filtering for students only
-    return registrations
-      .filter(reg => reg.users?.role === 'student')
-      .map(reg => {
-        const attendanceRecord = attendanceRecords.find(a => a.studentId === reg.session_registrations.studentId);
+    return enrollments
+      .filter(enrollment => enrollment.users?.role === 'student')
+      .map(enrollment => {
+        const attendanceRecord = attendanceRecords.find(a => a.studentId === enrollment.course_enrollments.studentId);
         return {
-          studentId: reg.session_registrations.studentId,
-          student: reg.users!,
+          studentId: enrollment.course_enrollments.studentId,
+          student: enrollment.users!,
           status: attendanceRecord?.status || null,
           markedAt: attendanceRecord?.markedAt || null,
         };
