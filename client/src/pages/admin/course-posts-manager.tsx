@@ -11,7 +11,7 @@ type TopicWithPosts = Topic & { posts: Post[] };
 
 export function CoursePostsManager({ courseId }: CoursePostsManagerProps) {
   const { data: topics, isLoading } = useQuery<TopicWithPosts[]>({
-    queryKey: [`/api/topics?courseId=${courseId}`],
+    queryKey: [`/api/courses/${courseId}/content`],
   });
 
   const allPosts = topics?.flatMap(topic => 

@@ -1198,6 +1198,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/courses/:id/content', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Students only see published content
+      const publishedOnly = user.role === 'student';
+      const topicsWithContent = await storage.getCourseWithContent(id, publishedOnly);
+      
+      res.json(topicsWithContent);
+    } catch (error) {
+      console.error("Error fetching course content:", error);
+      res.status(500).json({ message: "Failed to fetch course content" });
+    }
+  });
+
   app.post('/api/admin/topics', isAuthenticated, requireRole(['admin', 'instructor']), async (req: any, res) => {
     try {
       const topicData = insertTopicSchema.parse(req.body);

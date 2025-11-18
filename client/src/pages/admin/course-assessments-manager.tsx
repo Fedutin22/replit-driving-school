@@ -12,7 +12,7 @@ type TopicWithAssessments = Topic & { assessments: TopicAssessment[] };
 
 export function CourseAssessmentsManager({ courseId }: CourseAssessmentsManagerProps) {
   const { data: topics, isLoading } = useQuery<TopicWithAssessments[]>({
-    queryKey: [`/api/topics?courseId=${courseId}`],
+    queryKey: [`/api/courses/${courseId}/content`],
   });
 
   const allAssessments = topics?.flatMap(topic => 
