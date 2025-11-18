@@ -2,19 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardCheck, Clock, Hash } from "lucide-react";
-import type { TopicAssessment, Topic } from "@shared/schema";
+import type { TopicAssessment, Topic, Course } from "@shared/schema";
 
 interface CourseAssessmentsManagerProps {
   courseId: string;
 }
 
 type TopicWithAssessments = Topic & { assessments: TopicAssessment[] };
+type CourseContent = { course: Course; topics: TopicWithAssessments[]; };
 
 export function CourseAssessmentsManager({ courseId }: CourseAssessmentsManagerProps) {
-  const { data: topics, isLoading } = useQuery<TopicWithAssessments[]>({
+  const { data: courseContent, isLoading } = useQuery<CourseContent>({
     queryKey: [`/api/courses/${courseId}/content`],
   });
 
+  const topics = courseContent?.topics;
   const allAssessments = topics?.flatMap(topic => 
     topic.assessments.map(assessment => ({
       ...assessment,

@@ -1346,13 +1346,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         schedules.map(async (schedule) => {
           const instructor = await storage.getUser(schedule.instructorId);
           const topic = schedule.topicId ? await storage.getTopic(schedule.topicId) : null;
-          const registeredCount = await storage.getSessionRegistrationCount(schedule.id);
           
           return {
             ...schedule,
             instructorName: instructor ? `${instructor.firstName} ${instructor.lastName}` : null,
             topicName: topic?.name,
-            registeredCount,
           };
         })
       );

@@ -1,19 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText } from "lucide-react";
-import type { Post, Topic } from "@shared/schema";
+import type { Post, Topic, Course } from "@shared/schema";
 
 interface CoursePostsManagerProps {
   courseId: string;
 }
 
 type TopicWithPosts = Topic & { posts: Post[] };
+type CourseContent = { course: Course; topics: TopicWithPosts[]; };
 
 export function CoursePostsManager({ courseId }: CoursePostsManagerProps) {
-  const { data: topics, isLoading } = useQuery<TopicWithPosts[]>({
+  const { data: courseContent, isLoading } = useQuery<CourseContent>({
     queryKey: [`/api/courses/${courseId}/content`],
   });
 
+  const topics = courseContent?.topics;
   const allPosts = topics?.flatMap(topic => 
     topic.posts.map(post => ({
       ...post,

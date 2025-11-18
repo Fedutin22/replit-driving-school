@@ -517,7 +517,7 @@ export function CourseContentManager({ course, open, onClose }: CourseContentMan
   };
 
   const content = (
-          <Tabs defaultValue="topics" className={embedded ? "" : "mt-4"}>
+          <Tabs defaultValue="topics" className="mt-4">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="topics" data-testid="tab-topics">
                 <List className="h-4 w-4 mr-2" />
