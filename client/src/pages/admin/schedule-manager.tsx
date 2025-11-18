@@ -24,7 +24,6 @@ const scheduleSchema = z.object({
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   location: z.string().optional(),
-  capacity: z.coerce.number().min(1, "Capacity must be at least 1").default(20),
 });
 
 type ScheduleForm = z.infer<typeof scheduleSchema>;
@@ -32,7 +31,6 @@ type ScheduleForm = z.infer<typeof scheduleSchema>;
 interface ScheduleWithDetails extends Schedule {
   instructorName?: string;
   topicName?: string;
-  registeredCount?: number;
 }
 
 interface StudentAttendance {
@@ -95,7 +93,6 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
       startTime: "",
       endTime: "",
       location: "",
-      capacity: 20,
     },
   });
 
@@ -189,7 +186,6 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
         startTime: format(startDate, "yyyy-MM-dd'T'HH:mm"),
         endTime: format(endDate, "yyyy-MM-dd'T'HH:mm"),
         location: schedule.location || "",
-        capacity: schedule.capacity,
       });
     } else {
       setEditingSchedule(null);
@@ -261,7 +257,6 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
                 const endDate = typeof schedule.endTime === 'string' ? new Date(schedule.endTime) : schedule.endTime;
                 const startDate = typeof schedule.startTime === 'string' ? new Date(schedule.startTime) : schedule.startTime;
                 const isPast = endDate < new Date();
-                const seatsLeft = schedule.capacity - (schedule.registeredCount || 0);
                 
                 return (
                   <Card key={schedule.id} data-testid={`card-schedule-${schedule.id}`}>
@@ -304,7 +299,7 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
                       <div className="flex items-center gap-2 text-sm mb-4">
                         <Users className="h-4 w-4 text-muted-foreground" />
                         <span className="text-muted-foreground">
-                          Instructor: {schedule.instructorName} • {schedule.registeredCount || 0}/{schedule.capacity} registered
+                          Instructor: {schedule.instructorName}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -462,19 +457,6 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="capacity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Capacity</FormLabel>
-                    <FormControl>
-                      <Input data-testid="input-schedule-capacity" type="number" min="1" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <DialogFooter>
                 <Button
                   type="button"
@@ -514,8 +496,8 @@ export function ScheduleManager({ course, open, onClose }: ScheduleManagerProps)
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-lg font-medium text-foreground mb-2">No students registered</p>
-                <p className="text-sm text-muted-foreground">No students have registered for this session yet</p>
+                <p className="text-lg font-medium text-foreground mb-2">No students enrolled</p>
+                <p className="text-sm text-muted-foreground">No students are enrolled in this course yet</p>
               </CardContent>
             </Card>
           ) : (
