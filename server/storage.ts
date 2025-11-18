@@ -3,6 +3,8 @@ import {
   courses,
   topics,
   posts,
+  questionCategories,
+  questionTopics,
   questions,
   testTemplates,
   testQuestions,
@@ -25,6 +27,10 @@ import {
   type Topic,
   type InsertPost,
   type Post,
+  type InsertQuestionCategory,
+  type QuestionCategory,
+  type InsertQuestionTopic,
+  type QuestionTopic,
   type InsertQuestion,
   type Question,
   type InsertTestTemplate,
@@ -80,8 +86,22 @@ export interface IStorage {
   deletePost(id: string): Promise<void>;
   reorderPost(id: string, direction: 'up' | 'down'): Promise<void>;
   
+  // Question category operations
+  getQuestionCategories(): Promise<QuestionCategory[]>;
+  getQuestionCategory(id: string): Promise<QuestionCategory | undefined>;
+  createQuestionCategory(category: InsertQuestionCategory): Promise<QuestionCategory>;
+  updateQuestionCategory(id: string, data: Partial<QuestionCategory>): Promise<QuestionCategory>;
+  deleteQuestionCategory(id: string): Promise<void>;
+  
+  // Question topic operations
+  getQuestionTopics(categoryId: string): Promise<QuestionTopic[]>;
+  getQuestionTopic(id: string): Promise<QuestionTopic | undefined>;
+  createQuestionTopic(topic: InsertQuestionTopic): Promise<QuestionTopic>;
+  updateQuestionTopic(id: string, data: Partial<QuestionTopic>): Promise<QuestionTopic>;
+  deleteQuestionTopic(id: string): Promise<void>;
+  
   // Question operations
-  getQuestions(): Promise<Question[]>;
+  getQuestions(topicId?: string): Promise<Question[]>;
   getQuestion(id: string): Promise<Question | undefined>;
   searchQuestions(params: { searchTerm?: string; tag?: string; limit: number }): Promise<Question[]>;
   createQuestion(question: InsertQuestion): Promise<Question>;
@@ -520,8 +540,75 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  // Question category operations
+  async getQuestionCategories(): Promise<QuestionCategory[]> {
+    return await db.select().from(questionCategories).orderBy(asc(questionCategories.orderIndex));
+  }
+
+  async getQuestionCategory(id: string): Promise<QuestionCategory | undefined> {
+    const [category] = await db.select().from(questionCategories).where(eq(questionCategories.id, id));
+    return category || undefined;
+  }
+
+  async createQuestionCategory(categoryData: InsertQuestionCategory): Promise<QuestionCategory> {
+    const [category] = await db.insert(questionCategories).values(categoryData).returning();
+    return category;
+  }
+
+  async updateQuestionCategory(id: string, data: Partial<QuestionCategory>): Promise<QuestionCategory> {
+    const [category] = await db
+      .update(questionCategories)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(questionCategories.id, id))
+      .returning();
+    return category;
+  }
+
+  async deleteQuestionCategory(id: string): Promise<void> {
+    await db.delete(questionCategories).where(eq(questionCategories.id, id));
+  }
+
+  // Question topic operations
+  async getQuestionTopics(categoryId: string): Promise<QuestionTopic[]> {
+    return await db
+      .select()
+      .from(questionTopics)
+      .where(eq(questionTopics.categoryId, categoryId))
+      .orderBy(asc(questionTopics.orderIndex));
+  }
+
+  async getQuestionTopic(id: string): Promise<QuestionTopic | undefined> {
+    const [topic] = await db.select().from(questionTopics).where(eq(questionTopics.id, id));
+    return topic || undefined;
+  }
+
+  async createQuestionTopic(topicData: InsertQuestionTopic): Promise<QuestionTopic> {
+    const [topic] = await db.insert(questionTopics).values(topicData).returning();
+    return topic;
+  }
+
+  async updateQuestionTopic(id: string, data: Partial<QuestionTopic>): Promise<QuestionTopic> {
+    const [topic] = await db
+      .update(questionTopics)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(questionTopics.id, id))
+      .returning();
+    return topic;
+  }
+
+  async deleteQuestionTopic(id: string): Promise<void> {
+    await db.delete(questionTopics).where(eq(questionTopics.id, id));
+  }
+
   // Question operations
-  async getQuestions(): Promise<Question[]> {
+  async getQuestions(topicId?: string): Promise<Question[]> {
+    if (topicId) {
+      return await db
+        .select()
+        .from(questions)
+        .where(eq(questions.questionTopicId, topicId))
+        .orderBy(desc(questions.createdAt));
+    }
     return await db.select().from(questions).orderBy(desc(questions.createdAt));
   }
 
