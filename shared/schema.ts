@@ -51,7 +51,6 @@ export const users = pgTable("users", {
 export const usersRelations = relations(users, ({ many }) => ({
   courseEnrollments: many(courseEnrollments),
   testResults: many(testResults),
-  sessionRegistrations: many(sessionRegistrations),
   attendance: many(attendance),
   payments: many(payments),
   certificates: many(certificates),
@@ -328,7 +327,6 @@ export const schedules = pgTable("schedules", {
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
   location: varchar("location", { length: 255 }),
-  capacity: integer("capacity").notNull().default(20),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -346,27 +344,7 @@ export const schedulesRelations = relations(schedules, ({ one, many }) => ({
     fields: [schedules.instructorId],
     references: [users.id],
   }),
-  registrations: many(sessionRegistrations),
   attendance: many(attendance),
-}));
-
-// Session registrations
-export const sessionRegistrations = pgTable("session_registrations", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  scheduleId: varchar("schedule_id").notNull().references(() => schedules.id, { onDelete: "cascade" }),
-  studentId: varchar("student_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  registeredAt: timestamp("registered_at").defaultNow().notNull(),
-});
-
-export const sessionRegistrationsRelations = relations(sessionRegistrations, ({ one }) => ({
-  schedule: one(schedules, {
-    fields: [sessionRegistrations.scheduleId],
-    references: [schedules.id],
-  }),
-  student: one(users, {
-    fields: [sessionRegistrations.studentId],
-    references: [users.id],
-  }),
 }));
 
 // Attendance
@@ -509,9 +487,6 @@ export type TopicAssessmentQuestion = typeof topicAssessmentQuestions.$inferSele
 
 export type InsertSchedule = typeof schedules.$inferInsert;
 export type Schedule = typeof schedules.$inferSelect;
-
-export type InsertSessionRegistration = typeof sessionRegistrations.$inferInsert;
-export type SessionRegistration = typeof sessionRegistrations.$inferSelect;
 
 export type InsertAttendance = typeof attendance.$inferInsert;
 export type Attendance = typeof attendance.$inferSelect;

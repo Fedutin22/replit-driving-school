@@ -13,7 +13,6 @@ import {
   topicAssessments,
   topicAssessmentQuestions,
   schedules,
-  sessionRegistrations,
   attendance,
   payments,
   certificates,
@@ -166,15 +165,10 @@ export interface IStorage {
   getSchedules(): Promise<Schedule[]>;
   getSchedulesByCourse(courseId: string): Promise<Schedule[]>;
   getSchedule(id: string): Promise<Schedule | undefined>;
-  getSchedulesWithDetails(studentId?: string): Promise<Array<Schedule & { course: Course; topic: Topic | null; instructor: User; registeredStudentsCount: number; isRegistered?: boolean }>>;
+  getSchedulesWithDetails(studentId?: string): Promise<Array<Schedule & { course: Course; topic: Topic | null; instructor: User; registeredStudentsCount: number }>>;
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
   updateSchedule(id: string, data: Partial<Schedule>): Promise<Schedule>;
   deleteSchedule(id: string): Promise<void>;
-  registerForSession(scheduleId: string, studentId: string): Promise<void>;
-  unregisterFromSession(scheduleId: string, studentId: string): Promise<void>;
-  getSessionRegistrationCount(scheduleId: string): Promise<number>;
-  isStudentRegistered(scheduleId: string, studentId: string): Promise<boolean>;
-  
   // Attendance operations
   markAttendance(scheduleId: string, studentId: string, status: 'present' | 'absent', markedBy: string): Promise<void>;
   getSessionAttendance(scheduleId: string): Promise<Array<Attendance & { student: User }>>;
@@ -1550,25 +1544,13 @@ export class DatabaseStorage implements IStorage {
         .orderBy(schedules.startTime);
     }
 
-    const result = await Promise.all(
-      schedulesData.map(async (row) => {
-        const registrationCount = await this.getSessionRegistrationCount(row.schedule.id);
-        const isRegistered = studentId
-          ? await this.isStudentRegistered(row.schedule.id, studentId)
-          : undefined;
-
-        return {
-          ...row.schedule,
-          course: row.course,
-          topic: row.topic,
-          instructor: row.instructor,
-          registeredStudentsCount: registrationCount,
-          isRegistered,
-        };
-      })
-    );
-
-    return result;
+    return schedulesData.map((row) => ({
+      ...row.schedule,
+      course: row.course,
+      topic: row.topic,
+      instructor: row.instructor,
+      registeredStudentsCount: 0,
+    }));
   }
 
   async createSchedule(scheduleData: InsertSchedule): Promise<Schedule> {
@@ -1587,59 +1569,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSchedule(id: string): Promise<void> {
     await db.delete(schedules).where(eq(schedules.id, id));
-  }
-
-  async registerForSession(scheduleId: string, studentId: string): Promise<void> {
-    // Check if already registered
-    const alreadyRegistered = await this.isStudentRegistered(scheduleId, studentId);
-    if (alreadyRegistered) {
-      throw new Error("Already registered for this session");
-    }
-
-    // Check capacity
-    const schedule = await this.getSchedule(scheduleId);
-    if (!schedule) {
-      throw new Error("Schedule not found");
-    }
-
-    const currentCount = await this.getSessionRegistrationCount(scheduleId);
-    if (currentCount >= schedule.capacity) {
-      throw new Error("Session is full");
-    }
-
-    await db.insert(sessionRegistrations).values({ scheduleId, studentId });
-  }
-
-  async unregisterFromSession(scheduleId: string, studentId: string): Promise<void> {
-    await db
-      .delete(sessionRegistrations)
-      .where(
-        and(
-          eq(sessionRegistrations.scheduleId, scheduleId),
-          eq(sessionRegistrations.studentId, studentId)
-        )
-      );
-  }
-
-  async getSessionRegistrationCount(scheduleId: string): Promise<number> {
-    const result = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(sessionRegistrations)
-      .where(eq(sessionRegistrations.scheduleId, scheduleId));
-    return Number(result[0]?.count || 0);
-  }
-
-  async isStudentRegistered(scheduleId: string, studentId: string): Promise<boolean> {
-    const [registration] = await db
-      .select()
-      .from(sessionRegistrations)
-      .where(
-        and(
-          eq(sessionRegistrations.scheduleId, scheduleId),
-          eq(sessionRegistrations.studentId, studentId)
-        )
-      );
-    return !!registration;
   }
 
   // Attendance operations
